@@ -1,0 +1,485 @@
+# Product Requirements Document (PRD): SmartClip AI
+
+Author: Sarian
+Status: Draft / In-Review
+Version: 1.0
+Runtime: Python 3.10+
+Engine: FFmpeg, MoviePy, Google Gemini API
+
+---
+
+## 1. One Pager
+
+### Overview
+SmartClip AI is a CLI-based application designed to empower content creators by automatically transforming long-form videos (podcasts, interviews, webinars) into viral-ready short clips (TikTok, Reels, Shorts). By leveraging the native multimodal capabilities of Google Gemini, the application automates the heavy lifting of content selection, transcription, and video editing in a single workflow.
+
+### Problem Statement
+* Time Consuming: Manually finding "viral moments" in a 1-hour podcast takes hours of tedious review.
+* High Barrier to Entry: Professional video editors are expensive, and complex editing software has a steep learning curve for solo creators.
+* Content Fragmentation: Creators struggle to maintain a consistent posting schedule due to the effort required to repurpose long-form content.
+
+### Objectives
+* Efficiency: Reduce the time to create a short clip from hours to under 5 minutes.
+* Automation: Fully automate the "Transcription -> Identification -> Trimming -> Captioning" pipeline.
+* Quality: Ensure AI-selected clips are contextually relevant with synchronized "burn-in" captions.
+
+### Constraints
+* CLI Only: The MVP will not have a GUI; users must interact via terminal.
+* API Dependency: Reliability is tied to Google Gemini API performance and rate limits.
+* Local Processing: Video rendering relies on the user's local hardware resources.
+
+### Persona
+* The Tech-Savvy Creator: YouTubers who understand basic CLI and want to scale content distribution.
+* Developer-Influencer: Users wanting to integrate automated clipping into their personal dev-ops pipeline.
+
+### Use Cases
+* Scenario: A user provides a YouTube URL via `sclip --url [URL]`. The system downloads the video, uses Gemini to identify high-engagement segments, trims the video to 9:16, burns in captions, and outputs ready-to-upload clips.
+
+---
+
+## 2. Full PRD Features
+
+### Features In (MVP)
+* Automated Video Ingestion: Input via YouTube URL (yt-dlp) or local files.
+* AI-Powered Analysis: Single API call to Gemini for transcription, moment identification, and word-level timestamps.
+* Automated Video Editing: Trimming based on AI timestamps and 9:16 vertical cropping.
+* Dynamic Captions: Hardcoded (burn-in) text synchronized with audio.
+* Metadata Generation: Output `.txt` files with AI-generated catchy titles and SEO descriptions.
+
+### Features Out (Post-MVP)
+* Active Face Tracking: Dynamic reframing to keep subjects centered.
+* Manual Timeline Editor: No manual intervention in the clipping process for MVP.
+* Direct Social Integration: Auto-posting to TikTok/Instagram APIs.
+* GUI / Visual Interface: Terminal-only for MVP.
+
+---
+
+## 3. Success Metrics
+* Processing Efficiency: Total processing time < 50% of the original video duration.
+* Sync Accuracy: Caption timestamps within < 0.3s deviation from audio.
+* Success Rate: > 95% of valid video inputs processed without system crash.
+
+---
+
+## 4. Technical Considerations
+
+### Runtime & Dependencies
+* Runtime: Python 3.10+
+* External Dependencies: FFmpeg (required), yt-dlp (for YouTube downloads)
+* Package Dependencies: `google-genai`, `moviepy`, `click` (CLI framework), `rich` (terminal UI)
+
+### API Configuration
+* Google Gemini API key stored in environment variable `GEMINI_API_KEY` or config file
+* Config location: `~/.sclip/config.json`
+
+### Workflow Logic
+1. **Input Validation**: Check URL/file validity
+2. **Download** (if URL): Use yt-dlp to fetch video
+3. **Chunking**: Split long videos into processable segments (for context window limits)
+4. **AI Analysis**: Send to Gemini for transcription + moment identification
+5. **JSON Parsing**: Extract clips data (start_time, end_time, captions)
+6. **Video Processing**: Trim, crop to 9:16, burn-in captions
+7. **Metadata Generation**: Create title/description files
+8. **Cleanup**: Remove temp files
+
+### Data Requirement
+AI must return structured JSON:
+```json
+{
+  "clips": [
+    {
+      "start_time": 125.5,
+      "end_time": 185.2,
+      "title": "The moment everything changed",
+      "description": "SEO-optimized description...",
+      "captions": [
+        {"start": 125.5, "end": 127.0, "text": "So here's the thing"},
+        {"start": 127.0, "end": 129.5, "text": "about building startups"}
+      ]
+    }
+  ]
+}
+```
+
+---
+
+## 5. CLI Interface Specification
+
+### Command Syntax
+```
+sclip --url <youtube-url> [options]
+sclip --input <file> [options]
+sclip -u <youtube-url> [options]
+sclip -i <file> [options]
+```
+
+### Required Arguments (one of the following)
+| Flag | Alias | Description |
+|------|-------|-------------|
+| `--url` | `-u` | YouTube URL to process |
+| `--input` | `-i` | Path to local video file |
+
+### Optional Arguments
+| Flag | Alias | Default | Description |
+|------|-------|---------|-------------|
+| `--output` | `-o` | `./output` | Output directory for clips |
+| `--max-clips` | `-n` | `5` | Maximum number of clips to generate |
+| `--min-duration` | | `30` | Minimum clip duration in seconds |
+| `--max-duration` | | `90` | Maximum clip duration in seconds |
+| `--aspect-ratio` | `-r` | `9:16` | Output aspect ratio (9:16, 1:1, 16:9) |
+| `--caption-style` | `-c` | `default` | Caption style preset (default, bold, minimal, karaoke) |
+| `--language` | `-l` | `auto` | Source language (auto-detect or ISO code) |
+| `--force` | `-f` | `false` | Overwrite existing output files |
+| `--verbose` | `-v` | `false` | Show detailed progress info |
+| `--quiet` | `-q` | `false` | Silent mode, only show errors |
+| `--dry-run` | | `false` | Preview clips without rendering |
+| `--no-captions` | | `false` | Skip caption burn-in |
+| `--no-metadata` | | `false` | Skip metadata file generation |
+| `--keep-temp` | | `false` | Keep temporary files (for debugging) |
+| `--config` | | `~/.sclip/config.json` | Custom config file path |
+| `--help` | `-h` | | Show help message |
+| `--version` | `-V` | | Show version number |
+
+### API & Model Arguments
+| Flag | Alias | Default | Description |
+|------|-------|---------|-------------|
+| `--api-key` | | env var | Gemini API key (overrides env/config) |
+| `--model` | `-m` | `gemini-1.5-flash` | Gemini model to use |
+
+### FFmpeg Arguments
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--ffmpeg-path` | `auto` | Custom path to FFmpeg binary |
+| `--check-deps` | `false` | Check FFmpeg/yt-dlp installation |
+| `--setup` | `false` | Run dependency setup wizard |
+
+### Flag Combinations & Conflicts
+| Combination | Behavior |
+|-------------|----------|
+| `--url` + `--input` | Error: "Cannot use both --url and --input" |
+| `--verbose` + `--quiet` | Error: "Cannot use both --verbose and --quiet" |
+| `--dry-run` + `--force` | Allowed: --force is ignored in dry-run |
+| `--no-captions` + `--caption-style` | Warning: --caption-style ignored |
+
+### Usage Examples
+```bash
+# Basic usage - process YouTube video
+sclip --url "https://youtube.com/watch?v=xxxxx"
+
+# Local file with custom output
+sclip -i podcast.mp4 -o ./clips
+
+# Limit to 3 clips, 60-90 seconds each
+sclip -u "https://youtube.com/watch?v=xxxxx" -n 3 --min-duration 60 --max-duration 90
+
+# Square format for Instagram feed
+sclip -i interview.mp4 -r 1:1
+
+# Preview without rendering
+sclip -u "https://youtube.com/watch?v=xxxxx" --dry-run
+
+# Verbose mode for debugging
+sclip -i video.mp4 -v
+
+# Skip captions (faster processing)
+sclip -i video.mp4 --no-captions
+
+# Check dependencies
+sclip --check-deps
+
+# Use specific Gemini model
+sclip -i video.mp4 -m gemini-1.5-pro
+```
+
+---
+
+## 6. Error Handling Specification
+
+### Exit Codes
+```python
+EXIT_CODES = {
+    "SUCCESS": 0,
+    "DEPENDENCY_ERROR": 1,
+    "INPUT_ERROR": 2,
+    "OUTPUT_ERROR": 3,
+    "API_ERROR": 4,
+    "PROCESSING_ERROR": 5,
+    "VALIDATION_ERROR": 6,
+    "INTERRUPT": 130,
+}
+```
+
+### Dependency Errors
+| Condition | Exit Code | Message |
+|-----------|-----------|---------|
+| FFmpeg not found | 1 | "FFmpeg not found. Run 'sclip --setup' to install" |
+| yt-dlp not found (URL mode) | 1 | "yt-dlp not found. Run 'pip install yt-dlp'" |
+| Python version < 3.10 | 1 | "Python 3.10+ required. Current: <version>" |
+
+### Input Errors
+| Condition | Exit Code | Message |
+|-----------|-----------|---------|
+| Invalid YouTube URL | 2 | "Invalid YouTube URL: <url>" |
+| Video unavailable/private | 2 | "Video unavailable or private: <url>" |
+| Input file not found | 2 | "Input file not found: <path>" |
+| Unsupported video format | 2 | "Unsupported video format: <ext>" |
+| Video too short | 2 | "Video too short (<duration>s). Minimum: 60 seconds" |
+
+### Output Errors
+| Condition | Exit Code | Message |
+|-----------|-----------|---------|
+| Output exists (no --force) | 3 | "Output directory not empty. Use --force to overwrite" |
+| Cannot create output dir | 3 | "Cannot create output directory: <path>" |
+| Insufficient disk space | 3 | "Insufficient disk space. Required: ~<size>" |
+
+### API Errors
+| Condition | Exit Code | Message |
+|-----------|-----------|---------|
+| Missing API key | 4 | "Gemini API key not found. Set GEMINI_API_KEY or use --api-key" |
+| Invalid API key | 4 | "Invalid Gemini API key" |
+| Rate limit exceeded | 4 | "API rate limit exceeded. Try again in <time>" |
+| Context window exceeded | 4 | "Video too long for single API call. Chunking..." |
+| API response parse error | 4 | "Failed to parse AI response. Retrying..." |
+
+### Processing Errors
+| Condition | Exit Code | Message |
+|-----------|-----------|---------|
+| FFmpeg process failed | 5 | "FFmpeg error: <stderr>" |
+| No clips identified | 5 | "AI found no suitable clips in video" |
+| Caption sync failed | 5 | "Caption synchronization failed" |
+
+### Validation Errors
+| Condition | Exit Code | Message |
+|-----------|-----------|---------|
+| Invalid aspect ratio | 6 | "Invalid aspect ratio. Use: 9:16, 1:1, or 16:9" |
+| Invalid duration range | 6 | "min-duration must be less than max-duration" |
+| Duration out of bounds | 6 | "Duration must be between 15 and 180 seconds" |
+
+---
+
+## 7. Progress & Output Feedback
+
+### Normal Mode (default)
+```
+✓ Input: podcast_episode_42.mp4 (1:23:45)
+✓ Analyzing with Gemini...
+✓ Found 5 viral moments
+⠋ Rendering clip 1/5...
+⠋ Rendering clip 2/5...
+⠋ Rendering clip 3/5...
+⠋ Rendering clip 4/5...
+⠋ Rendering clip 5/5...
+✓ Complete! 5 clips saved to ./output
+```
+
+### Verbose Mode (--verbose)
+```
+[INFO] Checking dependencies...
+[INFO] FFmpeg: 6.0 ✓
+[INFO] yt-dlp: 2024.01.01 ✓
+[INFO] Downloading video: https://youtube.com/watch?v=xxxxx
+[INFO] Download complete: 1.2 GB
+[INFO] Video duration: 1:23:45 (5025 seconds)
+[INFO] Resolution: 1920x1080
+[INFO] Sending to Gemini API (model: gemini-1.5-flash)...
+[INFO] API response received (2.3s)
+[INFO] Identified 5 clips:
+       - Clip 1: 02:05 - 03:15 "The startup pivot moment"
+       - Clip 2: 15:30 - 16:45 "Why most founders fail"
+       - Clip 3: 28:10 - 29:30 "The $1M lesson"
+       - Clip 4: 45:00 - 46:20 "Hiring your first employee"
+       - Clip 5: 1:02:15 - 1:03:30 "Final advice for founders"
+[INFO] Rendering clip 1/5...
+[INFO] - Trimming: 02:05 - 03:15
+[INFO] - Cropping to 9:16
+[INFO] - Burning captions (23 segments)
+[INFO] - Saved: ./output/clip_01_startup_pivot.mp4
+[INFO] Rendering clip 2/5...
+...
+[SUCCESS] All clips rendered successfully!
+[INFO] Output directory: ./output
+[INFO] Total processing time: 4m 32s
+```
+
+### Quiet Mode (--quiet)
+```
+# No output on success, only errors
+# Exit code 0 = success
+```
+
+### Dry Run Mode (--dry-run)
+```
+╭─────────────────────────────────────────────────────────────╮
+│                    DRY RUN PREVIEW                          │
+├─────────────────────────────────────────────────────────────┤
+│ Input:      podcast_episode_42.mp4                          │
+│ Duration:   1:23:45 (5025s)                                 │
+│ Resolution: 1920x1080                                       │
+├─────────────────────────────────────────────────────────────┤
+│ Settings:                                                   │
+│ • Max clips: 5                                              │
+│ • Duration: 30-90 seconds                                   │
+│ • Aspect ratio: 9:16                                        │
+│ • Captions: enabled (default style)                         │
+├─────────────────────────────────────────────────────────────┤
+│ Identified Clips:                                           │
+│ 1. [02:05-03:15] "The startup pivot moment"                 │
+│ 2. [15:30-16:45] "Why most founders fail"                   │
+│ 3. [28:10-29:30] "The $1M lesson"                           │
+│ 4. [45:00-46:20] "Hiring your first employee"               │
+│ 5. [1:02:15-1:03:30] "Final advice for founders"            │
+├─────────────────────────────────────────────────────────────┤
+│ Est. Output Size: ~250 MB                                   │
+│ Est. Processing Time: ~5 minutes                            │
+╰─────────────────────────────────────────────────────────────╯
+No files were created (dry run mode)
+```
+
+### Check Dependencies (--check-deps)
+```
+Checking dependencies...
+✓ Python:   3.11.0
+✓ FFmpeg:   6.0 (path: /usr/bin/ffmpeg)
+✓ yt-dlp:   2024.01.01
+✓ Gemini:   API key configured
+All dependencies are installed!
+```
+
+---
+
+## 8. Project Structure
+```
+sclip/
+├── src/
+│   ├── __init__.py
+│   ├── main.py               # Entry point & CLI setup (click)
+│   ├── commands/
+│   │   ├── __init__.py
+│   │   ├── clip.py           # Main clipping workflow
+│   │   └── setup.py          # Dependency setup wizard
+│   ├── services/
+│   │   ├── __init__.py
+│   │   ├── downloader.py     # yt-dlp wrapper for YouTube downloads
+│   │   ├── gemini.py         # Gemini API client & prompt engineering
+│   │   └── renderer.py       # FFmpeg/MoviePy video processing
+│   ├── utils/
+│   │   ├── __init__.py
+│   │   ├── captions.py       # Caption formatting & burn-in
+│   │   ├── cleanup.py        # Temp file management
+│   │   ├── config.py         # Config file management
+│   │   ├── ffmpeg.py         # FFmpeg detection & execution
+│   │   ├── logger.py         # Console output formatting
+│   │   ├── validation.py     # Input validation
+│   │   └── video.py          # Video analysis utilities
+│   └── types/
+│       └── __init__.py       # TypedDict, dataclasses, constants
+├── tests/
+│   ├── __init__.py
+│   ├── test_gemini.py
+│   ├── test_renderer.py
+│   └── test_validation.py
+├── pyproject.toml
+├── requirements.txt
+├── README.md
+└── AGENTS.md
+```
+
+---
+
+## 9. Configuration
+
+### Config File Location
+- Path: `~/.sclip/config.json`
+- Stores: API keys, default settings, FFmpeg paths
+
+### Config Schema
+```json
+{
+  "gemini_api_key": "your-api-key",
+  "default_model": "gemini-1.5-flash",
+  "ffmpeg_path": "auto",
+  "default_output_dir": "./output",
+  "default_aspect_ratio": "9:16",
+  "default_caption_style": "default",
+  "max_clips": 5,
+  "min_duration": 30,
+  "max_duration": 90
+}
+```
+
+### Environment Variables
+| Variable | Description |
+|----------|-------------|
+| `GEMINI_API_KEY` | Google Gemini API key |
+| `SCLIP_CONFIG` | Custom config file path |
+| `SCLIP_OUTPUT_DIR` | Default output directory |
+
+---
+
+## 10. Caption Styles
+
+### Available Presets
+| Style | Description |
+|-------|-------------|
+| `default` | White text, black outline, bottom-center |
+| `bold` | Large yellow text, heavy shadow |
+| `minimal` | Small white text, subtle shadow |
+| `karaoke` | Word-by-word highlight animation |
+
+### Caption Configuration
+```json
+{
+  "font": "Arial Bold",
+  "font_size": 48,
+  "color": "#FFFFFF",
+  "stroke_color": "#000000",
+  "stroke_width": 2,
+  "position": "bottom",
+  "margin_bottom": 100
+}
+```
+
+---
+
+## 11. GTM (Go-To-Market) Approach
+* Build in Public: Share side-by-side process videos on X (Twitter) and LinkedIn.
+* GitHub Open Release: Release source code to build credibility within the developer community.
+* Product Hunt Launch: Position as a free developer tool for tech-savvy creators.
+
+---
+
+## 12. Open Issues & Q&A
+
+**Q: How to handle videos longer than Gemini's context window?**
+A: Implement chunking strategy - split video into 30-minute segments, process each, then merge results. Use audio-only for initial analysis to reduce token usage.
+
+**Q: What about copyrighted/restricted YouTube videos?**
+A: yt-dlp will fail gracefully with appropriate error message. User must have rights to the content.
+
+**Q: How to stay within Gemini free tier?**
+A: Default to `gemini-1.5-flash` (cheaper), implement caching for repeated analysis, warn users when approaching limits.
+
+**Q: What if AI returns no clips?**
+A: Retry with adjusted prompt parameters, or inform user that video may not have suitable "viral moments".
+
+---
+
+## 13. Timeline and Phasing
+| Feature | Status | Target |
+| :--- | :--- | :--- |
+| Core CLI & Ingestion | Completed | July 2024 |
+| Gemini API Integration | In Development | August 2024 |
+| Caption Rendering Engine | Backlog | September 2024 |
+| Beta Release (GitHub) | Backlog | October 2024 |
+
+---
+
+## 14. Supported Formats
+
+### Input Video Formats
+`.mp4`, `.mkv`, `.avi`, `.mov`, `.webm`, `.m4v`, `.mpeg`, `.mpg`, `.flv`
+
+### Output Format
+- Video: `.mp4` (H.264 + AAC)
+- Metadata: `.txt` (title + description)
+- Captions: `.srt` (optional export)

@@ -103,7 +103,7 @@ class CLIOptions:
     max_duration: int = 60
     aspect_ratio: AspectRatio = "9:16"
     caption_style: CaptionStyle = "default"
-    language: str = "en"
+    language: str = "id"  # Default to Indonesian
     force: bool = False
     verbose: bool = False
     quiet: bool = False

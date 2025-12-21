@@ -80,44 +80,45 @@ FALLBACK_FONTS = {
 CAPTION_STYLES: dict[CaptionStyle, CaptionStyleConfig] = {
     "default": {
         # Clean, readable style suitable for most content
+        # Smaller font for word-by-word display
         "font": "Arial Bold",
-        "font_size": 48,
+        "font_size": 36,
         "color": "#FFFFFF",           # White text
         "stroke_color": "#000000",    # Black outline for readability
-        "stroke_width": 2,
+        "stroke_width": 3,
         "position": "bottom",
-        "margin_bottom": 100,         # Pixels from bottom edge
+        "margin_bottom": 180,         # Higher from bottom to not cover faces
     },
     "bold": {
         # High-impact style for emphasis and viral content
         "font": "Impact",
-        "font_size": 64,
+        "font_size": 42,
         "color": "#FFFF00",           # Yellow text for attention
         "stroke_color": "#000000",
         "stroke_width": 4,            # Thicker outline
-        "position": "center",         # Centered vertically
-        "margin_bottom": 0,
+        "position": "bottom",
+        "margin_bottom": 180,
     },
     "minimal": {
         # Subtle style that doesn't distract from content
         "font": "Helvetica",
-        "font_size": 36,
+        "font_size": 28,
         "color": "#FFFFFF",
         "stroke_color": "#333333",    # Subtle dark gray outline
         "stroke_width": 1,
         "position": "bottom",
-        "margin_bottom": 50,
+        "margin_bottom": 120,
     },
     "karaoke": {
         # Word-by-word highlight effect (like karaoke)
         "font": "Arial Bold",
-        "font_size": 52,
+        "font_size": 38,
         "color": "#FFFFFF",
         "highlight_color": "#00FF00", # Green highlight for current word
         "stroke_color": "#000000",
-        "stroke_width": 2,
+        "stroke_width": 3,
         "position": "bottom",
-        "margin_bottom": 100,
+        "margin_bottom": 180,
         "word_highlight": True,       # Enable karaoke effect
     },
 }
@@ -303,7 +304,7 @@ def _generate_standard_events(
     captions: list[CaptionSegment],
     clip_start_time: float
 ) -> str:
-    """Generate standard ASS dialogue events.
+    """Generate standard ASS dialogue events with limited words per line.
     
     Args:
         captions: List of caption segments
@@ -314,7 +315,10 @@ def _generate_standard_events(
     """
     events = []
     
-    for caption in captions:
+    # Process captions - split long text into smaller chunks (max 2 words)
+    processed_captions = _split_long_captions(captions, max_words=2)
+    
+    for caption in processed_captions:
         # Adjust times relative to clip start
         start = caption["start"] - clip_start_time
         end = caption["end"] - clip_start_time
@@ -336,6 +340,61 @@ def _generate_standard_events(
         events.append(f"Dialogue: 0,{start_time},{end_time},Default,,0,0,0,,{text}")
     
     return "\n".join(events)
+
+
+def _split_long_captions(
+    captions: list[CaptionSegment],
+    max_words: int = 2
+) -> list[CaptionSegment]:
+    """Split captions with too many words into smaller chunks.
+    
+    This ensures captions don't cover too much of the screen.
+    Each chunk gets proportional timing based on word count.
+    
+    Args:
+        captions: List of caption segments
+        max_words: Maximum words per caption (default: 2 for word-by-word)
+        
+    Returns:
+        List of caption segments with at most max_words each
+    """
+    result: list[CaptionSegment] = []
+    
+    for caption in captions:
+        text = caption["text"].strip()
+        words = text.split()
+        
+        if len(words) <= max_words:
+            # Caption is short enough, keep as-is
+            result.append(caption)
+        else:
+            # Split into chunks
+            start_time = caption["start"]
+            end_time = caption["end"]
+            total_duration = end_time - start_time
+            
+            # Calculate time per word
+            time_per_word = total_duration / len(words) if words else 0
+            
+            # Create chunks
+            for i in range(0, len(words), max_words):
+                chunk_words = words[i:i + max_words]
+                chunk_text = " ".join(chunk_words)
+                
+                chunk_start = start_time + (i * time_per_word)
+                chunk_end = start_time + ((i + len(chunk_words)) * time_per_word)
+                
+                # Ensure last chunk ends at original end time
+                if i + max_words >= len(words):
+                    chunk_end = end_time
+                
+                result.append(CaptionSegment(
+                    start=chunk_start,
+                    end=chunk_end,
+                    text=chunk_text
+                ))
+    
+    return result
 
 
 def _generate_karaoke_events(

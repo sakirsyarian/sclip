@@ -68,6 +68,7 @@ from src.types import AspectRatio, CaptionStyle, ClipData, CLIOptions, VideoInfo
 from src.utils.ffmpeg import find_ffmpeg, run_ffmpeg, FFmpegResult
 from src.utils.video import analyze_video
 from src.utils.captions import generate_ass_subtitle, CAPTION_STYLES
+from src.utils.logger import get_logger
 
 
 class RenderError(Exception):
@@ -219,24 +220,27 @@ _HW_CACHE_VERSION = "v2"  # Increment this when detection logic changes
 def calculate_crop_params(
     source_width: int,
     source_height: int,
-    target_ratio: AspectRatio
+    target_ratio: AspectRatio,
+    focus_position: str = "upper"
 ) -> tuple[int, int, int, int]:
-    """Calculate crop parameters for center crop to target aspect ratio.
+    """Calculate crop parameters for target aspect ratio with focus position.
     
     Calculates the x, y offset and width, height for cropping the source
-    video to the target aspect ratio while maintaining center alignment.
-    The crop is always centered on the source video.
+    video to the target aspect ratio. The focus_position determines where
+    the crop is centered - "upper" focuses on the top third (for faces),
+    "center" for middle, "lower" for bottom.
     
-    For example, cropping a 1920x1080 (16:9) video to 9:16:
+    For example, cropping a 1920x1080 (16:9) video to 9:16 with upper focus:
     - Target aspect is 9/16 = 0.5625
     - Source aspect is 16/9 = 1.778
     - Source is wider, so we crop the width
-    - Result: 607x1080 centered crop
+    - Result: 607x1080 crop, positioned to capture upper portion
     
     Args:
         source_width: Width of source video in pixels
         source_height: Height of source video in pixels
         target_ratio: Target aspect ratio ("9:16", "1:1", or "16:9")
+        focus_position: Where to focus crop ("upper", "center", "lower")
         
     Returns:
         Tuple of (crop_x, crop_y, crop_width, crop_height)
@@ -266,7 +270,7 @@ def calculate_crop_params(
         crop_width = int(source_height * target_aspect)
         # Ensure even dimensions for video encoding compatibility
         crop_width = crop_width - (crop_width % 2)
-        # Center horizontally
+        # Center horizontally (faces are usually centered horizontally)
         crop_x = (source_width - crop_width) // 2
         crop_y = 0
     else:
@@ -275,9 +279,24 @@ def calculate_crop_params(
         crop_height = int(source_width / target_aspect)
         # Ensure even dimensions for video encoding compatibility
         crop_height = crop_height - (crop_height % 2)
-        # Center vertically
         crop_x = 0
-        crop_y = (source_height - crop_height) // 2
+        
+        # Calculate vertical position based on focus
+        available_height = source_height - crop_height
+        
+        if focus_position == "upper":
+            # Focus on upper third - good for capturing faces/speakers
+            # Position crop to capture top 1/3 of the frame
+            crop_y = available_height // 4  # Slight offset from top
+        elif focus_position == "lower":
+            # Focus on lower third
+            crop_y = (available_height * 3) // 4
+        else:
+            # Center (default)
+            crop_y = available_height // 2
+        
+        # Ensure crop_y is even for encoding compatibility
+        crop_y = crop_y - (crop_y % 2)
     
     return (crop_x, crop_y, crop_width, crop_height)
 
@@ -401,11 +420,13 @@ class VideoRenderer:
         end_time = clip_data["end_time"]
         duration = end_time - start_time
         
-        # Calculate crop parameters
-        crop_x, crop_y, crop_width, crop_height = calculate_crop_params(
-            video_info.width,
-            video_info.height,
-            aspect_ratio
+        # Calculate crop parameters - try face tracking first
+        crop_x, crop_y, crop_width, crop_height = self._calculate_smart_crop(
+            input_path=input_path,
+            video_info=video_info,
+            aspect_ratio=aspect_ratio,
+            start_time=start_time,
+            end_time=end_time
         )
         
         # Build filter chain
@@ -584,6 +605,127 @@ class VideoRenderer:
                         callback(progress)
             except (IndexError, ValueError):
                 pass
+    
+    def _calculate_smart_crop(
+        self,
+        input_path: str,
+        video_info: VideoInfo,
+        aspect_ratio: AspectRatio,
+        start_time: float,
+        end_time: float
+    ) -> tuple[int, int, int, int]:
+        """Calculate crop parameters using face/speaker tracking if available.
+        
+        Tries Active Speaker Detection first (best for multi-person videos),
+        falls back to Face Detection, then to static upper-center crop.
+        
+        Args:
+            input_path: Path to source video
+            video_info: Video metadata
+            aspect_ratio: Target aspect ratio
+            start_time: Clip start time
+            end_time: Clip end time
+            
+        Returns:
+            Tuple of (crop_x, crop_y, crop_width, crop_height)
+        """
+        logger = get_logger()
+        
+        # First calculate target dimensions based on aspect ratio
+        _, _, target_width, target_height = calculate_crop_params(
+            video_info.width,
+            video_info.height,
+            aspect_ratio
+        )
+        
+        # Try Active Speaker Detection first (best for interviews/podcasts)
+        try:
+            from src.services.speaker_tracker import (
+                is_speaker_tracking_available,
+                ActiveSpeakerTracker
+            )
+            
+            if is_speaker_tracking_available():
+                logger.debug("Using Active Speaker Detection...")
+                tracker = ActiveSpeakerTracker(sample_rate=5)
+                
+                try:
+                    positions = tracker.analyze_clip(
+                        input_path, start_time, end_time
+                    )
+                    
+                    if positions:
+                        unique_speakers = len(set(p.face_id for p in positions))
+                        avg_speaking = sum(p.speaking_score for p in positions) / len(positions)
+                        logger.debug(
+                            f"Detected {unique_speakers} speaker(s), "
+                            f"avg speaking score: {avg_speaking:.2f}"
+                        )
+                        
+                        crop_region = tracker.calculate_crop_region(
+                            positions,
+                            video_info.width,
+                            video_info.height,
+                            target_width,
+                            target_height
+                        )
+                        return (
+                            crop_region.x,
+                            crop_region.y,
+                            crop_region.width,
+                            crop_region.height
+                        )
+                finally:
+                    tracker.close()
+                    
+        except ImportError:
+            pass
+        except Exception as e:
+            logger.debug(f"Active Speaker Detection failed: {e}")
+        
+        # Fallback to basic Face Detection
+        try:
+            from src.services.face_tracker import (
+                is_face_tracking_available,
+                FaceTracker
+            )
+            
+            if is_face_tracking_available():
+                logger.debug("Falling back to Face Detection...")
+                tracker = FaceTracker(sample_rate=10)
+                
+                try:
+                    positions = tracker.analyze_clip(
+                        input_path, start_time, end_time
+                    )
+                    
+                    if positions:
+                        logger.debug(f"Detected {len(positions)} face positions")
+                        crop_region = tracker.calculate_crop_region(
+                            positions,
+                            video_info.width,
+                            video_info.height,
+                            target_width,
+                            target_height
+                        )
+                        return (
+                            crop_region.x,
+                            crop_region.y,
+                            crop_region.width,
+                            crop_region.height
+                        )
+                finally:
+                    tracker.close()
+                    
+        except ImportError:
+            pass
+        except Exception as e:
+            logger.debug(f"Face tracking failed: {e}, using static crop")
+        
+        # Fallback to static crop with upper focus
+        return calculate_crop_params(
+            video_info.width, video_info.height, aspect_ratio
+        )
     
     def render_all_clips(
         self,

@@ -32,6 +32,20 @@ from src.services.renderer import (
     calculate_crop_params,
 )
 
+# Face tracking (optional - may not be installed)
+try:
+    from src.services.face_tracker import (
+        FaceTracker,
+        FacePosition,
+        CropRegion,
+        analyze_face_positions,
+        calculate_smart_crop,
+        is_face_tracking_available,
+    )
+    FACE_TRACKING_AVAILABLE = True
+except ImportError:
+    FACE_TRACKING_AVAILABLE = False
+
 __all__ = [
     # Downloader
     "YouTubeDownloader",
@@ -59,4 +73,17 @@ __all__ = [
     "VideoRenderer",
     "RenderError",
     "calculate_crop_params",
+    # Face Tracking
+    "FACE_TRACKING_AVAILABLE",
 ]
+
+# Add face tracking exports if available
+if FACE_TRACKING_AVAILABLE:
+    __all__.extend([
+        "FaceTracker",
+        "FacePosition",
+        "CropRegion",
+        "analyze_face_positions",
+        "calculate_smart_crop",
+        "is_face_tracking_available",
+    ])

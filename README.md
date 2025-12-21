@@ -286,7 +286,7 @@ sclip [OPTIONS]
 |------|-------|---------|-------------|
 | `--caption-style` | `-s` | `default` | Style: `default`, `bold`, `minimal`, `karaoke` |
 | `--no-captions` | | `false` | Skip caption burn-in |
-| `--language` | `-l` | `en` | Language code for captions |
+| `--language` | `-l` | `id` | Language code for captions |
 
 ### API & Model
 

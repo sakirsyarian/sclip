@@ -6,3 +6,7 @@ click>=8.1.0
 rich>=13.0.0
 google-genai>=1.0.0
 yt-dlp>=2024.1.0
+
+# Face tracking (optional but recommended)
+mediapipe>=0.10.0
+opencv-python>=4.8.0

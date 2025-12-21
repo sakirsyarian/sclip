@@ -14,6 +14,7 @@
 6. [Install FFmpeg](#6-install-ffmpeg)
 7. [Menjalankan SmartClip](#7-menjalankan-smartclip)
 8. [Contoh Penggunaan](#8-contoh-penggunaan)
+   - [8.1 Multi-Language Support](#81-multi-language-support-dukungan-multi-bahasa)
 9. [Troubleshooting](#9-troubleshooting)
 10. [Glossary](#10-glossary)
 11. [FAQ (Frequently Asked Questions)](#11-faq-frequently-asked-questions)
@@ -467,6 +468,113 @@ sclip -i video.mp4 --min-duration 20 --max-duration 45
 sclip -i video.mp4 -f
 ```
 
+### Contoh 16: Menggunakan Bahasa Lain untuk Captions
+
+```cmd
+# Default: Bahasa Indonesia (tanpa flag)
+sclip -i video.mp4
+
+# Explicit Bahasa Indonesia
+sclip -i video.mp4 -l id
+
+# English
+sclip -i video.mp4 -l en
+
+# Bahasa lain
+sclip -i video.mp4 -l ja   # Japanese
+sclip -i video.mp4 -l ko   # Korean
+```
+
+---
+
+## 8.1. Multi-Language Support (Dukungan Multi-Bahasa)
+
+SmartClip mendukung berbagai bahasa untuk caption generation. Bahasa default adalah **Indonesia (`id`)**, tapi kamu bisa menggunakan bahasa lain sesuai kebutuhan.
+
+### Cara Menggunakan
+
+Gunakan flag `-l` atau `--language` diikuti kode bahasa:
+
+```cmd
+sclip -i video.mp4 -l <kode_bahasa>
+```
+
+### Daftar Bahasa yang Didukung
+
+| Kode | Bahasa | Contoh |
+|------|--------|--------|
+| `id` | Indonesia (Default) | `sclip -i video.mp4` atau `sclip -i video.mp4 -l id` |
+| `en` | English | `sclip -i video.mp4 -l en` |
+| `ja` | Japanese (日本語) | `sclip -i video.mp4 -l ja` |
+| `ko` | Korean (한국어) | `sclip -i video.mp4 -l ko` |
+| `zh` | Chinese (中文) | `sclip -i video.mp4 -l zh` |
+| `es` | Spanish (Español) | `sclip -i video.mp4 -l es` |
+| `fr` | French (Français) | `sclip -i video.mp4 -l fr` |
+| `de` | German (Deutsch) | `sclip -i video.mp4 -l de` |
+| `pt` | Portuguese (Português) | `sclip -i video.mp4 -l pt` |
+| `ru` | Russian (Русский) | `sclip -i video.mp4 -l ru` |
+| `ar` | Arabic (العربية) | `sclip -i video.mp4 -l ar` |
+| `hi` | Hindi (हिन्दी) | `sclip -i video.mp4 -l hi` |
+| `th` | Thai (ไทย) | `sclip -i video.mp4 -l th` |
+| `vi` | Vietnamese (Tiếng Việt) | `sclip -i video.mp4 -l vi` |
+| `ms` | Malay (Bahasa Melayu) | `sclip -i video.mp4 -l ms` |
+
+> **Note:** Bahasa yang didukung tergantung pada kemampuan Google Gemini AI. Daftar di atas adalah bahasa-bahasa umum yang biasanya didukung dengan baik.
+
+### Bagaimana Cara Kerjanya?
+
+1. SmartClip mengirim parameter `language` ke Gemini AI
+2. Gemini menganalisis audio dalam video
+3. Gemini men-transcribe dan generate captions dalam bahasa yang diminta
+4. Captions di-render ke video output
+
+### Tips Penggunaan Multi-Bahasa
+
+1. **Sesuaikan dengan audio video**: Jika video berbahasa Indonesia, gunakan `-l id`. Jika berbahasa Inggris, gunakan `-l en`.
+
+2. **Translasi otomatis**: Gemini bisa men-transcribe audio dalam satu bahasa dan menghasilkan caption dalam bahasa lain (misalnya audio English → caption Indonesia).
+
+3. **Akurasi terbaik**: Untuk hasil terbaik, gunakan bahasa yang sama dengan audio video.
+
+4. **Font support**: Pastikan sistem kamu memiliki font yang mendukung bahasa target (terutama untuk CJK: Chinese, Japanese, Korean).
+
+### Contoh Use Cases
+
+```cmd
+# Podcast Indonesia → Caption Indonesia (default)
+sclip -i podcast_indo.mp4
+
+# Interview English → Caption English
+sclip -i interview_eng.mp4 -l en
+
+# Video Jepang → Caption Jepang
+sclip -i anime_clip.mp4 -l ja
+
+# Video Korea → Caption Korea
+sclip -i kdrama_clip.mp4 -l ko
+
+# Video English → Caption Indonesia (translasi)
+sclip -i ted_talk.mp4 -l id
+
+# Video Indonesia → Caption English (translasi)
+sclip -i vlog_indo.mp4 -l en
+```
+
+### Troubleshooting Multi-Bahasa
+
+**Q: Caption tidak muncul atau karakter aneh?**
+- Pastikan font yang mendukung bahasa tersebut ter-install di sistem
+- Untuk CJK (Chinese, Japanese, Korean), install font seperti Noto Sans CJK
+
+**Q: Hasil transcription tidak akurat?**
+- Pastikan audio video jelas dan minim noise
+- Coba gunakan bahasa yang sama dengan audio video
+- Gemini AI tidak 100% akurat, terutama untuk bahasa dengan dialek regional
+
+**Q: Bahasa tidak didukung?**
+- Coba gunakan kode bahasa ISO 639-1 yang benar
+- Beberapa bahasa mungkin memiliki dukungan terbatas di Gemini
+
 ---
 
 ## 9. Troubleshooting
@@ -613,7 +721,7 @@ sclip [options]
 -n, --max-clips   : Jumlah clips (default: 5)
 -a, --aspect-ratio: Aspect ratio (9:16, 1:1, 16:9)
 -s, --caption-style: Style caption (default, bold, minimal, karaoke)
--l, --language    : Bahasa untuk captions (default: en)
+-l, --language    : Bahasa untuk captions (default: id - Indonesia)
 -f, --force       : Overwrite existing files
 -v, --verbose     : Mode detail
 -q, --quiet       : Mode silent (errors only)
@@ -641,7 +749,7 @@ sclip [options]
 | `--max-duration` | - | `60` | Durasi maksimum (detik) |
 | `--aspect-ratio` | `-a` | `9:16` | Aspect ratio output |
 | `--caption-style` | `-s` | `default` | Style caption |
-| `--language` | `-l` | `en` | Bahasa |
+| `--language` | `-l` | `id` | Bahasa (Indonesia) |
 | `--force` | `-f` | `false` | Overwrite files |
 | `--verbose` | `-v` | `false` | Debug output |
 | `--quiet` | `-q` | `false` | Silent mode |

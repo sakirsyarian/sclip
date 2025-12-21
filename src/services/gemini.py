@@ -78,9 +78,16 @@ For each clip, provide:
 1. Precise start and end timestamps (in seconds, with decimals)
 2. A catchy, clickbait-style title (max 60 chars)
 3. An SEO-optimized description (max 200 chars)
-4. Word-level captions with timestamps
+4. ACCURATE word-by-word captions with precise timestamps
 
-Language: {language}
+CRITICAL CAPTION RULES:
+- Transcribe EXACTLY what is spoken - do not paraphrase or summarize
+- Each caption segment should contain ONLY 1-2 words maximum
+- Timestamps must be precise to match when each word is spoken
+- Listen carefully to the audio and transcribe accurately
+- Every single word must have its own timing
+
+Language for captions: {language}
 
 Return ONLY valid JSON in this exact format:
 {{
@@ -91,8 +98,11 @@ Return ONLY valid JSON in this exact format:
       "title": "Catchy title here",
       "description": "SEO description here",
       "captions": [
-        {{"start": 125.5, "end": 127.0, "text": "First phrase"}},
-        {{"start": 127.0, "end": 129.5, "text": "Second phrase"}}
+        {{"start": 125.5, "end": 125.9, "text": "Hello"}},
+        {{"start": 125.9, "end": 126.3, "text": "everyone"}},
+        {{"start": 126.3, "end": 126.8, "text": "today"}},
+        {{"start": 126.8, "end": 127.2, "text": "we"}},
+        {{"start": 127.2, "end": 127.6, "text": "will"}}
       ]
     }}
   ]
@@ -148,6 +158,48 @@ def build_analysis_prompt(
     )
 
 
+def _fix_json_escapes(json_text: str) -> str:
+    """Fix common invalid JSON escape sequences from Gemini.
+    
+    Gemini sometimes returns JSON with invalid escape sequences like:
+    - \\x (should be \\\\x or removed)
+    - \\' (should be ' in JSON)
+    - Unescaped backslashes before non-escape characters
+    
+    Args:
+        json_text: Raw JSON text that may contain invalid escapes
+        
+    Returns:
+        Fixed JSON text with valid escape sequences
+    """
+    # Fix invalid escape sequences by replacing single backslash 
+    # followed by invalid escape chars with double backslash or removing
+    # Valid JSON escapes: \", \\, \/, \b, \f, \n, \r, \t, \uXXXX
+    
+    result = []
+    i = 0
+    while i < len(json_text):
+        if json_text[i] == '\\' and i + 1 < len(json_text):
+            next_char = json_text[i + 1]
+            # Valid JSON escape characters
+            if next_char in '"\\bfnrt/':
+                result.append(json_text[i:i+2])
+                i += 2
+            # Unicode escape \uXXXX
+            elif next_char == 'u' and i + 5 < len(json_text):
+                result.append(json_text[i:i+6])
+                i += 6
+            # Invalid escapes - remove the backslash, keep the character
+            else:
+                result.append(next_char)
+                i += 2
+        else:
+            result.append(json_text[i])
+            i += 1
+    
+    return ''.join(result)
+
+
 def parse_response(response_text: str) -> GeminiResponse:
     """Parse JSON response from Gemini into GeminiResponse.
     
@@ -176,6 +228,10 @@ def parse_response(response_text: str) -> GeminiResponse:
             if lines and lines[-1].strip() == "```":
                 lines = lines[:-1]
             json_text = "\n".join(lines)
+        
+        # Fix common JSON escape issues from Gemini
+        # Replace invalid escape sequences with valid ones
+        json_text = _fix_json_escapes(json_text)
         
         data = json.loads(json_text)
         
@@ -301,7 +357,7 @@ class GeminiClient:
         max_clips: int = 5,
         min_duration: int = 15,
         max_duration: int = 60,
-        language: str = "en",
+        language: str = "id",
         progress_callback: Callable[[str], None] | None = None
     ) -> GeminiResponse:
         """Upload video to Gemini and analyze for viral moments.
@@ -445,7 +501,7 @@ class GeminiClient:
         max_clips: int = 5,
         min_duration: int = 15,
         max_duration: int = 60,
-        language: str = "en",
+        language: str = "id",
         chunk_duration: int | None = None,
         progress_callback: Callable[[str], None] | None = None
     ) -> GeminiResponse:
@@ -831,7 +887,7 @@ async def analyze_video(
     max_clips: int = 5,
     min_duration: int = 15,
     max_duration: int = 60,
-    language: str = "en",
+    language: str = "id",
     model: str = "gemini-2.0-flash",
     progress_callback: Callable[[str], None] | None = None
 ) -> GeminiResponse:

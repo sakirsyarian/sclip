@@ -138,9 +138,9 @@ def version_callback(ctx: click.Context, param: click.Parameter, value: bool) ->
 @click.option(
     "-l", "--language",
     type=str,
-    default="en",
+    default="id",
     show_default=True,
-    help="Language code for captions and analysis",
+    help="Language code for captions and analysis (e.g., 'id' for Indonesian, 'en' for English)",
 )
 @click.option(
     "-f", "--force",

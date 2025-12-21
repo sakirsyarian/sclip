@@ -32,8 +32,8 @@ Usage:
     response = await client.analyze_video(
         video_path="video.mp4",
         max_clips=5,
-        min_duration=15,
-        max_duration=60,
+        min_duration=45,
+        max_duration=180,
         language="en"
     )
     
@@ -355,8 +355,8 @@ class GeminiClient:
         self,
         video_path: str,
         max_clips: int = 5,
-        min_duration: int = 15,
-        max_duration: int = 60,
+        min_duration: int = 45,
+        max_duration: int = 180,
         language: str = "id",
         progress_callback: Callable[[str], None] | None = None
     ) -> GeminiResponse:
@@ -499,8 +499,8 @@ class GeminiClient:
         video_path: str,
         video_duration: float,
         max_clips: int = 5,
-        min_duration: int = 15,
-        max_duration: int = 60,
+        min_duration: int = 45,
+        max_duration: int = 180,
         language: str = "id",
         chunk_duration: int | None = None,
         progress_callback: Callable[[str], None] | None = None
@@ -885,8 +885,8 @@ async def analyze_video(
     api_key: str,
     video_path: str,
     max_clips: int = 5,
-    min_duration: int = 15,
-    max_duration: int = 60,
+    min_duration: int = 45,
+    max_duration: int = 180,
     language: str = "id",
     model: str = "gemini-2.0-flash",
     progress_callback: Callable[[str], None] | None = None
@@ -924,8 +924,8 @@ async def analyze_video_chunked(
     video_path: str,
     video_duration: float,
     max_clips: int = 5,
-    min_duration: int = 15,
-    max_duration: int = 60,
+    min_duration: int = 45,
+    max_duration: int = 180,
     language: str = "en",
     model: str = "gemini-2.0-flash",
     chunk_duration: int | None = None,

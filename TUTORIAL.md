@@ -745,8 +745,8 @@ sclip [options]
 | `--url` | `-u` | - | YouTube URL |
 | `--output` | `-o` | `./output` | Folder output |
 | `--max-clips` | `-n` | `5` | Maksimum clips |
-| `--min-duration` | - | `15` | Durasi minimum (detik) |
-| `--max-duration` | - | `60` | Durasi maksimum (detik) |
+| `--min-duration` | - | `45` | Durasi minimum (detik) |
+| `--max-duration` | - | `180` | Durasi maksimum (detik) |
 | `--aspect-ratio` | `-a` | `9:16` | Aspect ratio output |
 | `--caption-style` | `-s` | `default` | Style caption |
 | `--language` | `-l` | `id` | Bahasa (Indonesia) |

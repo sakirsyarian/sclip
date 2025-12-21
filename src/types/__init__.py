@@ -99,8 +99,8 @@ class CLIOptions:
     input: str | None = None
     output: str = "./output"
     max_clips: int = 5
-    min_duration: int = 15
-    max_duration: int = 60
+    min_duration: int = 45
+    max_duration: int = 180
     aspect_ratio: AspectRatio = "9:16"
     caption_style: CaptionStyle = "default"
     language: str = "id"  # Default to Indonesian
@@ -239,8 +239,8 @@ class Config:
     default_aspect_ratio: AspectRatio = "9:16"
     default_caption_style: CaptionStyle = "default"
     max_clips: int = 5
-    min_duration: int = 15
-    max_duration: int = 60
+    min_duration: int = 45
+    max_duration: int = 180
 
 
 # Export all types

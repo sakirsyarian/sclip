@@ -110,14 +110,14 @@ def version_callback(ctx: click.Context, param: click.Parameter, value: bool) ->
 @click.option(
     "--min-duration",
     type=int,
-    default=15,
+    default=45,
     show_default=True,
     help="Minimum clip duration in seconds",
 )
 @click.option(
     "--max-duration",
     type=int,
-    default=60,
+    default=180,
     show_default=True,
     help="Maximum clip duration in seconds",
 )

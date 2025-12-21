@@ -16,8 +16,17 @@ SmartClip AI is a CLI tool that automatically identifies the most engaging momen
 - 📺 YouTube URL support via yt-dlp
 - 📊 SEO-optimized titles and descriptions for each clip
 
+## 🚀 Try it on Google Colab (No Installation Required!)
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/sakirsyarian/sclip/blob/main/smartclip_colab.ipynb)
+
+Tidak perlu install apa-apa! Jalankan SmartClip AI langsung di browser dengan GPU gratis.
+
+👉 **[Panduan Lengkap Google Colab (Bahasa Indonesia)](COLAB_GUIDE.md)**
+
 ## Table of Contents
 
+- [Google Colab](#-try-it-on-google-colab-no-installation-required)
 - [Requirements](#requirements)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
@@ -158,11 +167,11 @@ sclip -i podcast.mp4 -o ./my-clips
 # Generate exactly 3 clips
 sclip -i video.mp4 -n 3
 
-# Set duration range: 45-75 seconds per clip
-sclip -i video.mp4 --min-duration 45 --max-duration 75
+# Set duration range: 30-90 seconds per clip
+sclip -i video.mp4 --min-duration 30 --max-duration 90
 
-# Generate longer clips (60-120 seconds)
-sclip -i webinar.mp4 --min-duration 60 --max-duration 120
+# Generate shorter clips (15-60 seconds)
+sclip -i webinar.mp4 --min-duration 15 --max-duration 60
 ```
 
 ### Aspect Ratio Options
@@ -236,7 +245,7 @@ sclip -i video.mp4 -q
 
 ```bash
 # Podcast episode → TikTok clips
-sclip -i "podcast_ep42.mp4" -n 5 -a 9:16 -s bold --min-duration 30 --max-duration 60
+sclip -i "podcast_ep42.mp4" -n 5 -a 9:16 -s bold --min-duration 45 --max-duration 120
 
 # Interview → Instagram Reels
 sclip -u "https://youtube.com/watch?v=xxxxx" -n 3 -a 9:16 -s karaoke -o ./reels
@@ -276,8 +285,8 @@ sclip [OPTIONS]
 | Flag | Alias | Default | Description |
 |------|-------|---------|-------------|
 | `--max-clips` | `-n` | `5` | Maximum number of clips to generate |
-| `--min-duration` | | `15` | Minimum clip duration (seconds) |
-| `--max-duration` | | `60` | Maximum clip duration (seconds) |
+| `--min-duration` | | `45` | Minimum clip duration (seconds) |
+| `--max-duration` | | `180` | Maximum clip duration (seconds) |
 | `--aspect-ratio` | `-a` | `9:16` | Output ratio: `9:16`, `1:1`, `16:9` |
 
 ### Caption Options
@@ -343,8 +352,8 @@ Location: `~/.sclip/config.json`
   "default_aspect_ratio": "9:16",
   "default_caption_style": "default",
   "max_clips": 5,
-  "min_duration": 15,
-  "max_duration": 60
+  "min_duration": 45,
+  "max_duration": 180
 }
 ```
 

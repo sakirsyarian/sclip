@@ -260,12 +260,16 @@ class GroqAnalyzer(BaseAnalyzer):
         captions: list[CaptionSegment] = []
         
         for word in transcription.words:
-            # Check if word falls within the clip range
-            if word.start >= start_time and word.end <= end_time:
-                # Adjust timestamps relative to clip start
+            # Include words that overlap with the time range
+            # A word overlaps if it starts before end_time AND ends after start_time
+            if word.start < end_time and word.end > start_time:
+                # Clamp word times to clip boundaries
+                word_start = max(word.start, start_time)
+                word_end = min(word.end, end_time)
+                
                 captions.append(CaptionSegment(
-                    start=word.start - start_time,
-                    end=word.end - start_time,
+                    start=word_start - start_time,
+                    end=word_end - start_time,
                     text=word.word
                 ))
         

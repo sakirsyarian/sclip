@@ -276,33 +276,70 @@ async def _analyze_with_gemini(
         # Use chunked analysis for long videos (> 30 minutes)
         chunk_threshold = 1800  # 30 minutes
         
-        if video_duration > chunk_threshold:
-            logger.info(f"Video is {format_duration(video_duration)}, using chunked analysis...")
+        # Check if audio-only mode is enabled
+        use_audio_only = getattr(options, 'audio_only', False)
+        
+        if use_audio_only:
+            logger.info("Using audio-only mode (faster upload)...")
             
-            async def do_analyze():
-                return await client.analyze_video_chunked(
-                    video_path=video_path,
-                    video_duration=video_duration,
-                    max_clips=options.max_clips,
-                    min_duration=options.min_duration,
-                    max_duration=options.max_duration,
-                    language=options.language,
-                    progress_callback=on_progress
-                )
-            
-            response = await with_retry(do_analyze, max_retries=3)
+            if video_duration > chunk_threshold:
+                logger.info(f"Video is {format_duration(video_duration)}, using chunked audio analysis...")
+                
+                async def do_analyze():
+                    return await client.analyze_audio_chunked(
+                        video_path=video_path,
+                        video_duration=video_duration,
+                        max_clips=options.max_clips,
+                        min_duration=options.min_duration,
+                        max_duration=options.max_duration,
+                        language=options.language,
+                        ffmpeg_path=options.ffmpeg_path,
+                        progress_callback=on_progress
+                    )
+                
+                response = await with_retry(do_analyze, max_retries=3)
+            else:
+                async def do_analyze():
+                    return await client.analyze_audio(
+                        video_path=video_path,
+                        max_clips=options.max_clips,
+                        min_duration=options.min_duration,
+                        max_duration=options.max_duration,
+                        language=options.language,
+                        ffmpeg_path=options.ffmpeg_path,
+                        progress_callback=on_progress
+                    )
+                
+                response = await with_retry(do_analyze, max_retries=3)
         else:
-            async def do_analyze():
-                return await client.analyze_video(
-                    video_path=video_path,
-                    max_clips=options.max_clips,
-                    min_duration=options.min_duration,
-                    max_duration=options.max_duration,
-                    language=options.language,
-                    progress_callback=on_progress
-                )
-            
-            response = await with_retry(do_analyze, max_retries=3)
+            # Original video upload mode
+            if video_duration > chunk_threshold:
+                logger.info(f"Video is {format_duration(video_duration)}, using chunked analysis...")
+                
+                async def do_analyze():
+                    return await client.analyze_video_chunked(
+                        video_path=video_path,
+                        video_duration=video_duration,
+                        max_clips=options.max_clips,
+                        min_duration=options.min_duration,
+                        max_duration=options.max_duration,
+                        language=options.language,
+                        progress_callback=on_progress
+                    )
+                
+                response = await with_retry(do_analyze, max_retries=3)
+            else:
+                async def do_analyze():
+                    return await client.analyze_video(
+                        video_path=video_path,
+                        max_clips=options.max_clips,
+                        min_duration=options.min_duration,
+                        max_duration=options.max_duration,
+                        language=options.language,
+                        progress_callback=on_progress
+                    )
+                
+                response = await with_retry(do_analyze, max_retries=3)
         
         return response["clips"]
         

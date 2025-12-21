@@ -220,6 +220,9 @@ sclip -i video.mp4 -v
 
 # Keep temporary files for inspection
 sclip -i video.mp4 --keep-temp
+
+# Use audio-only mode for faster upload (recommended for large files 1GB+)
+sclip -i large_video.mp4 --audio-only
 ```
 
 ### Advanced Options
@@ -315,6 +318,7 @@ sclip [OPTIONS]
 | `--verbose` | `-v` | Show detailed progress |
 | `--quiet` | `-q` | Silent mode, only show errors |
 | `--keep-temp` | | Keep temporary files |
+| `--audio-only` | | Extract audio only for faster upload (recommended for large files) |
 | `--ffmpeg-path` | | Custom FFmpeg binary path |
 | `--version` | | Show version and exit |
 | `--help` | `-h` | Show help message |

@@ -324,6 +324,9 @@ class GeminiClient:
         # Analyze a short video
         response = await client.analyze_video("video.mp4", max_clips=5)
         
+        # Analyze using audio only (faster for large files)
+        response = await client.analyze_audio("video.mp4", max_clips=5)
+        
         # Analyze a long video with chunking
         response = await client.analyze_video_chunked(
             "long_video.mp4",
@@ -350,6 +353,315 @@ class GeminiClient:
         self.client = genai.Client(api_key=api_key)
         self.model = model
         self._logger = get_logger()
+    
+    async def extract_audio(
+        self,
+        video_path: str,
+        ffmpeg_path: str | None = None
+    ) -> str:
+        """Extract audio from video file using FFmpeg.
+        
+        Extracts audio track to a temporary MP3 file for faster upload
+        to Gemini. Audio files are typically 10-20x smaller than video.
+        
+        Args:
+            video_path: Path to source video file
+            ffmpeg_path: Optional custom FFmpeg path
+            
+        Returns:
+            Path to extracted audio file (MP3)
+            
+        Raises:
+            GeminiUploadError: If audio extraction fails
+        """
+        from src.utils.ffmpeg import run_ffmpeg
+        
+        # Create temp file for audio
+        temp_dir = tempfile.gettempdir()
+        audio_filename = f"sclip_audio_{os.getpid()}.mp3"
+        audio_path = os.path.join(temp_dir, audio_filename)
+        
+        # FFmpeg command to extract audio
+        # -vn: no video, -acodec mp3: encode as MP3, -ab 128k: 128kbps bitrate
+        args = [
+            "-y",  # Overwrite output
+            "-i", video_path,
+            "-vn",  # No video
+            "-acodec", "libmp3lame",
+            "-ab", "128k",  # 128kbps - good balance of quality and size
+            "-ar", "44100",  # 44.1kHz sample rate
+            audio_path
+        ]
+        
+        self._logger.debug(f"Extracting audio to: {audio_path}")
+        
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            None,
+            lambda: run_ffmpeg(args, ffmpeg_path=ffmpeg_path, timeout=600)
+        )
+        
+        if not result.success:
+            raise GeminiUploadError(f"Failed to extract audio: {result.stderr}")
+        
+        # Check file size
+        if os.path.exists(audio_path):
+            size_mb = os.path.getsize(audio_path) / (1024 * 1024)
+            self._logger.debug(f"Audio extracted: {size_mb:.1f} MB")
+        
+        return audio_path
+    
+    async def analyze_audio(
+        self,
+        video_path: str,
+        max_clips: int = 5,
+        min_duration: int = 45,
+        max_duration: int = 180,
+        language: str = "id",
+        ffmpeg_path: str | None = None,
+        progress_callback: Callable[[str], None] | None = None
+    ) -> GeminiResponse:
+        """Extract audio from video and analyze for viral moments.
+        
+        This method extracts the audio track from the video and sends
+        only the audio to Gemini for analysis. This is much faster for
+        large video files (1GB+) since audio is typically 10-20x smaller.
+        
+        Args:
+            video_path: Path to video file
+            max_clips: Maximum number of clips to identify
+            min_duration: Minimum clip duration in seconds
+            max_duration: Maximum clip duration in seconds
+            language: Language code for captions
+            ffmpeg_path: Optional custom FFmpeg path
+            progress_callback: Optional callback for progress updates
+            
+        Returns:
+            GeminiResponse with identified clips
+            
+        Raises:
+            GeminiUploadError: If audio extraction or upload fails
+            GeminiAPIError: If API call fails
+            GeminiParseError: If response parsing fails
+        """
+        audio_path = None
+        
+        def update_progress(msg: str) -> None:
+            if progress_callback:
+                progress_callback(msg)
+            self._logger.debug(msg)
+        
+        try:
+            # Extract audio from video
+            update_progress("Extracting audio from video...")
+            audio_path = await self.extract_audio(video_path, ffmpeg_path)
+            
+            # Upload audio file
+            update_progress("Uploading audio to Gemini...")
+            try:
+                audio_file = await self._upload_video(audio_path)  # Same upload method works for audio
+            except Exception as e:
+                raise GeminiUploadError(f"Failed to upload audio: {e}")
+            
+            # Wait for processing
+            update_progress("Waiting for audio processing...")
+            try:
+                audio_file = await self._wait_for_processing(audio_file)
+            except Exception as e:
+                raise GeminiAPIError(f"Audio processing failed: {e}")
+            
+            # Generate content with audio
+            update_progress("Analyzing audio for viral moments...")
+            prompt = build_analysis_prompt(max_clips, min_duration, max_duration, language)
+            
+            try:
+                response = await self._generate_content(audio_file, prompt)
+            except Exception as e:
+                raise GeminiAPIError(f"Content generation failed: {e}")
+            
+            # Parse response
+            update_progress("Parsing analysis results...")
+            return parse_response(response)
+            
+        finally:
+            # Cleanup temp audio file
+            if audio_path and os.path.exists(audio_path):
+                try:
+                    os.remove(audio_path)
+                    self._logger.debug(f"Cleaned up temp audio: {audio_path}")
+                except OSError:
+                    pass
+    
+    async def analyze_audio_chunked(
+        self,
+        video_path: str,
+        video_duration: float,
+        max_clips: int = 5,
+        min_duration: int = 45,
+        max_duration: int = 180,
+        language: str = "id",
+        ffmpeg_path: str | None = None,
+        chunk_duration: int | None = None,
+        progress_callback: Callable[[str], None] | None = None
+    ) -> GeminiResponse:
+        """Process long video audio in chunks.
+        
+        Similar to analyze_video_chunked but extracts and analyzes
+        audio only, which is much faster for large files.
+        
+        Args:
+            video_path: Path to video file
+            video_duration: Total duration of the video in seconds
+            max_clips: Maximum number of clips to identify
+            min_duration: Minimum clip duration in seconds
+            max_duration: Maximum clip duration in seconds
+            language: Language code for captions
+            ffmpeg_path: Optional custom FFmpeg path
+            chunk_duration: Duration of each chunk in seconds
+            progress_callback: Optional callback for progress updates
+            
+        Returns:
+            GeminiResponse with identified clips (merged and deduplicated)
+        """
+        from src.utils.ffmpeg import run_ffmpeg
+        
+        chunk_duration = chunk_duration or self.DEFAULT_CHUNK_DURATION
+        
+        def update_progress(msg: str) -> None:
+            if progress_callback:
+                progress_callback(msg)
+            self._logger.debug(msg)
+        
+        # Calculate chunks needed
+        chunks = self._calculate_chunks(video_duration, chunk_duration)
+        num_chunks = len(chunks)
+        
+        if num_chunks == 1:
+            # Video fits in single chunk, use regular analysis
+            update_progress("Video fits in single chunk, using standard audio analysis...")
+            return await self.analyze_audio(
+                video_path=video_path,
+                max_clips=max_clips,
+                min_duration=min_duration,
+                max_duration=max_duration,
+                language=language,
+                ffmpeg_path=ffmpeg_path,
+                progress_callback=progress_callback
+            )
+        
+        update_progress(f"Video requires {num_chunks} chunks for audio analysis...")
+        
+        # Calculate clips per chunk
+        clips_per_chunk = max(3, (max_clips * 2) // num_chunks + 1)
+        
+        all_clips: list[ClipData] = []
+        temp_files: list[str] = []
+        
+        try:
+            for i, (start_time, end_time) in enumerate(chunks):
+                chunk_num = i + 1
+                update_progress(f"Processing audio chunk {chunk_num}/{num_chunks} ({start_time:.0f}s - {end_time:.0f}s)...")
+                
+                # Extract audio chunk
+                temp_audio_path = await self._extract_audio_chunk(
+                    video_path=video_path,
+                    start_time=start_time,
+                    end_time=end_time,
+                    chunk_index=i,
+                    ffmpeg_path=ffmpeg_path
+                )
+                temp_files.append(temp_audio_path)
+                
+                # Analyze chunk
+                update_progress(f"Analyzing audio chunk {chunk_num}/{num_chunks}...")
+                try:
+                    # Upload and analyze this audio chunk
+                    audio_file = await self._upload_video(temp_audio_path)
+                    audio_file = await self._wait_for_processing(audio_file)
+                    
+                    prompt = build_analysis_prompt(clips_per_chunk, min_duration, max_duration, language)
+                    response_text = await self._generate_content(audio_file, prompt)
+                    chunk_response = parse_response(response_text)
+                    
+                    # Adjust timestamps to original video timeline
+                    adjusted_clips = self._adjust_clip_timestamps(
+                        chunk_response["clips"],
+                        offset=start_time
+                    )
+                    all_clips.extend(adjusted_clips)
+                    
+                except (GeminiAPIError, GeminiParseError) as e:
+                    self._logger.warning(f"Audio chunk {chunk_num} analysis failed: {e}")
+                    continue
+            
+            if not all_clips:
+                raise GeminiAPIError("All audio chunk analyses failed")
+            
+            # Merge and deduplicate clips
+            update_progress("Merging and deduplicating clips...")
+            merged_clips = self._merge_and_deduplicate_clips(all_clips, max_clips)
+            
+            return GeminiResponse(clips=merged_clips)
+            
+        finally:
+            # Cleanup temp audio files
+            for temp_file in temp_files:
+                try:
+                    if os.path.exists(temp_file):
+                        os.remove(temp_file)
+                except OSError:
+                    pass
+    
+    async def _extract_audio_chunk(
+        self,
+        video_path: str,
+        start_time: float,
+        end_time: float,
+        chunk_index: int,
+        ffmpeg_path: str | None = None
+    ) -> str:
+        """Extract an audio chunk from the video.
+        
+        Args:
+            video_path: Path to source video
+            start_time: Start time in seconds
+            end_time: End time in seconds
+            chunk_index: Index of this chunk
+            ffmpeg_path: Optional FFmpeg path
+            
+        Returns:
+            Path to extracted audio chunk file
+        """
+        from src.utils.ffmpeg import run_ffmpeg
+        
+        temp_dir = tempfile.gettempdir()
+        chunk_filename = f"sclip_audio_chunk_{chunk_index}_{os.getpid()}.mp3"
+        chunk_path = os.path.join(temp_dir, chunk_filename)
+        
+        duration = end_time - start_time
+        
+        args = [
+            "-y",
+            "-ss", str(start_time),
+            "-i", video_path,
+            "-t", str(duration),
+            "-vn",
+            "-acodec", "libmp3lame",
+            "-ab", "128k",
+            "-ar", "44100",
+            chunk_path
+        ]
+        
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            None,
+            lambda: run_ffmpeg(args, ffmpeg_path=ffmpeg_path, timeout=300)
+        )
+        
+        if not result.success:
+            raise GeminiAPIError(f"Failed to extract audio chunk: {result.stderr}")
+        
+        return chunk_path
     
     async def analyze_video(
         self,

@@ -114,6 +114,7 @@ class CLIOptions:
     api_key: str | None = None
     model: str = "gemini-2.0-flash"
     ffmpeg_path: str | None = None
+    audio_only: bool = False
 
 
 @dataclass

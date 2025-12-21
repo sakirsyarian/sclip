@@ -83,7 +83,7 @@ Ada 3 cara untuk membuka notebook SmartClip AI di Colab:
 
 1. Buka [colab.research.google.com](https://colab.research.google.com)
 2. Klik tab **GitHub**
-3. Masukkan URL repository: `https://github.com/sarian/sclip`
+3. Masukkan URL repository: `https://github.com/sakirsyarian/sclip`
 4. Pilih file `smartclip_colab.ipynb`
 
 ---
@@ -254,7 +254,7 @@ GPU membuat proses face tracking lebih cepat.
 
 ## 📞 Butuh Bantuan?
 
-- Buka [GitHub Issues](https://github.com/sarian/sclip/issues) untuk melaporkan bug
+- Buka [GitHub Issues](https://github.com/sakirsyarian/sclip/issues) untuk melaporkan bug
 - Baca [README.md](README.md) untuk dokumentasi lengkap
 - Baca [TUTORIAL.md](TUTORIAL.md) untuk tutorial bahasa Indonesia
 

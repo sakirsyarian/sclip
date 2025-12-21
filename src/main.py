@@ -205,6 +205,12 @@ def version_callback(ctx: click.Context, param: click.Parameter, value: bool) ->
     help="Custom path to FFmpeg executable",
 )
 @click.option(
+    "--audio-only",
+    is_flag=True,
+    default=False,
+    help="Extract audio and send to Gemini instead of video (faster upload for large files)",
+)
+@click.option(
     "--info",
     "show_info",  # Rename to avoid confusion with info() method
     is_flag=True,
@@ -252,6 +258,7 @@ def main(
     api_key: Optional[str],
     model: str,
     ffmpeg_path: Optional[str],
+    audio_only: bool,
     show_info: bool,
     check_deps: bool,
     run_setup: bool,
@@ -314,6 +321,7 @@ def main(
             api_key=get_api_key(api_key),
             model=model,
             ffmpeg_path=get_ffmpeg_path(ffmpeg_path),
+            audio_only=audio_only,
         )
         
         # Route to clip command

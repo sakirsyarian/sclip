@@ -45,6 +45,10 @@ CONFIG_DIR_NAME = ".sclip"  # Hidden directory in user's home
 ENV_GROQ_API_KEY = "GROQ_API_KEY"
 ENV_OPENAI_API_KEY = "OPENAI_API_KEY"
 ENV_GEMINI_API_KEY = "GEMINI_API_KEY"
+ENV_DEEPGRAM_API_KEY = "DEEPGRAM_API_KEY"
+ENV_DEEPSEEK_API_KEY = "DEEPSEEK_API_KEY"
+ENV_ELEVENLABS_API_KEY = "ELEVENLABS_API_KEY"
+ENV_MISTRAL_API_KEY = "MISTRAL_API_KEY"
 ENV_OLLAMA_HOST = "OLLAMA_HOST"
 ENV_FFMPEG_PATH = "FFMPEG_PATH"
 
@@ -95,6 +99,10 @@ def _config_to_dict(config: Config) -> dict[str, Any]:
         "groq_api_key": config.groq_api_key,
         "openai_api_key": config.openai_api_key,
         "gemini_api_key": config.gemini_api_key,
+        "deepgram_api_key": config.deepgram_api_key,
+        "deepseek_api_key": config.deepseek_api_key,
+        "elevenlabs_api_key": config.elevenlabs_api_key,
+        "mistral_api_key": config.mistral_api_key,
         # Provider defaults
         "default_transcriber": config.default_transcriber,
         "default_analyzer": config.default_analyzer,
@@ -133,6 +141,10 @@ def _dict_to_config(data: dict[str, Any]) -> Config:
         groq_api_key=data.get("groq_api_key", defaults.groq_api_key),
         openai_api_key=data.get("openai_api_key", defaults.openai_api_key),
         gemini_api_key=data.get("gemini_api_key", defaults.gemini_api_key),
+        deepgram_api_key=data.get("deepgram_api_key", defaults.deepgram_api_key),
+        deepseek_api_key=data.get("deepseek_api_key", defaults.deepseek_api_key),
+        elevenlabs_api_key=data.get("elevenlabs_api_key", defaults.elevenlabs_api_key),
+        mistral_api_key=data.get("mistral_api_key", defaults.mistral_api_key),
         # Provider defaults
         default_transcriber=_validate_transcriber(
             data.get("default_transcriber", defaults.default_transcriber)
@@ -179,7 +191,7 @@ def _validate_caption_style(value: str) -> CaptionStyle:
 
 def _validate_transcriber(value: str) -> TranscriberProvider:
     """Validate and return transcriber provider value."""
-    valid_providers: list[TranscriberProvider] = ["groq", "openai", "local"]
+    valid_providers: list[TranscriberProvider] = ["groq", "openai", "deepgram", "elevenlabs", "local"]
     if value in valid_providers:
         return value  # type: ignore
     return "groq"
@@ -187,7 +199,7 @@ def _validate_transcriber(value: str) -> TranscriberProvider:
 
 def _validate_analyzer(value: str) -> AnalyzerProvider:
     """Validate and return analyzer provider value."""
-    valid_providers: list[AnalyzerProvider] = ["groq", "gemini", "openai", "ollama"]
+    valid_providers: list[AnalyzerProvider] = ["groq", "deepseek", "gemini", "openai", "mistral", "ollama"]
     if value in valid_providers:
         return value  # type: ignore
     return "groq"
@@ -282,6 +294,50 @@ def get_gemini_api_key(cli_key: str | None = None) -> str | None:
     return config.gemini_api_key
 
 
+def get_deepgram_api_key(cli_key: str | None = None) -> str | None:
+    """Get Deepgram API key with priority: CLI > environment > config."""
+    if cli_key:
+        return cli_key
+    env_key = os.environ.get(ENV_DEEPGRAM_API_KEY)
+    if env_key:
+        return env_key
+    config = load_config()
+    return config.deepgram_api_key
+
+
+def get_deepseek_api_key(cli_key: str | None = None) -> str | None:
+    """Get DeepSeek API key with priority: CLI > environment > config."""
+    if cli_key:
+        return cli_key
+    env_key = os.environ.get(ENV_DEEPSEEK_API_KEY)
+    if env_key:
+        return env_key
+    config = load_config()
+    return config.deepseek_api_key
+
+
+def get_elevenlabs_api_key(cli_key: str | None = None) -> str | None:
+    """Get ElevenLabs API key with priority: CLI > environment > config."""
+    if cli_key:
+        return cli_key
+    env_key = os.environ.get(ENV_ELEVENLABS_API_KEY)
+    if env_key:
+        return env_key
+    config = load_config()
+    return config.elevenlabs_api_key
+
+
+def get_mistral_api_key(cli_key: str | None = None) -> str | None:
+    """Get Mistral API key with priority: CLI > environment > config."""
+    if cli_key:
+        return cli_key
+    env_key = os.environ.get(ENV_MISTRAL_API_KEY)
+    if env_key:
+        return env_key
+    config = load_config()
+    return config.mistral_api_key
+
+
 def get_ollama_host(cli_host: str | None = None) -> str:
     """Get Ollama host with priority: CLI > environment > config."""
     if cli_host:
@@ -318,6 +374,10 @@ __all__ = [
     "get_groq_api_key",
     "get_openai_api_key",
     "get_gemini_api_key",
+    "get_deepgram_api_key",
+    "get_deepseek_api_key",
+    "get_elevenlabs_api_key",
+    "get_mistral_api_key",
     "get_ollama_host",
     "get_ffmpeg_path",
     "get_api_key",  # Legacy
@@ -326,6 +386,10 @@ __all__ = [
     "ENV_GROQ_API_KEY",
     "ENV_OPENAI_API_KEY",
     "ENV_GEMINI_API_KEY",
+    "ENV_DEEPGRAM_API_KEY",
+    "ENV_DEEPSEEK_API_KEY",
+    "ENV_ELEVENLABS_API_KEY",
+    "ENV_MISTRAL_API_KEY",
     "ENV_OLLAMA_HOST",
     "ENV_FFMPEG_PATH",
     "ENV_API_KEY",  # Legacy

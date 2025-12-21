@@ -213,6 +213,10 @@ SmartClip AI mendukung beberapa provider. **Groq adalah default dan GRATIS!**
 | Provider | Transcription | Analysis | Biaya |
 |----------|--------------|----------|-------|
 | **Groq** (Default) | ✅ Whisper | ✅ Llama 3.3 | **GRATIS** |
+| Deepgram | ✅ Nova | ❌ | $200 free credit |
+| ElevenLabs | ✅ Scribe | ❌ | Berbayar |
+| DeepSeek | ❌ | ✅ DeepSeek-V3 | Sangat murah |
+| Mistral | ❌ | ✅ Mistral | Free tier |
 | OpenAI | ✅ Whisper | ✅ GPT-4 | Berbayar |
 | Gemini | ❌ | ✅ Gemini | Free tier |
 | Ollama | ❌ | ✅ Local LLM | **GRATIS** (offline) |
@@ -584,6 +588,8 @@ SmartClip AI mendukung berbagai provider untuk transcription dan analysis.
 | Provider | Command | Keterangan |
 |----------|---------|------------|
 | Groq (Default) | `--transcriber groq` | Gratis, cepat, limit 25MB |
+| Deepgram | `--transcriber deepgram` | $200 free credit, sangat cepat |
+| ElevenLabs | `--transcriber elevenlabs` | 99 bahasa, akurasi tinggi |
 | OpenAI | `--transcriber openai` | Berbayar, akurat |
 | Local | `--transcriber local` | Offline, butuh faster-whisper |
 
@@ -592,7 +598,9 @@ SmartClip AI mendukung berbagai provider untuk transcription dan analysis.
 | Provider | Command | Keterangan |
 |----------|---------|------------|
 | Groq (Default) | `--analyzer groq` | Gratis, sangat cepat |
+| DeepSeek | `--analyzer deepseek` | Sangat murah |
 | Gemini | `--analyzer gemini` | Free tier tersedia |
+| Mistral | `--analyzer mistral` | Free tier tersedia |
 | OpenAI | `--analyzer openai` | Berbayar, kualitas tinggi |
 | Ollama | `--analyzer ollama` | Offline, butuh Ollama |
 
@@ -604,6 +612,12 @@ sclip -i video.mp4
 
 # Gratis dengan Gemini analysis
 sclip -i video.mp4 --analyzer gemini
+
+# Deepgram + DeepSeek (murah)
+sclip -i video.mp4 --transcriber deepgram --analyzer deepseek
+
+# ElevenLabs + Mistral
+sclip -i video.mp4 --transcriber elevenlabs --analyzer mistral
 
 # 100% Offline
 sclip -i video.mp4 --transcriber local --analyzer ollama
@@ -740,15 +754,15 @@ Pilih salah satu saja, jangan keduanya.
 | **CLI** | Command Line Interface - program yang dijalankan via terminal |
 | **Virtual Environment (venv)** | Ruang terisolasi untuk install package Python |
 | **pip** | Package manager untuk Python |
-| **API Key** | Kunci untuk mengakses layanan (seperti Gemini) |
+| **API Key** | Kunci untuk mengakses layanan (seperti Groq, Gemini) |
 | **FFmpeg** | Tool open-source untuk memproses video/audio |
 | **FFprobe** | Tool dari FFmpeg untuk menganalisis metadata video |
 | **yt-dlp** | Tool untuk download video dari YouTube |
 | **Burn-in Captions** | Subtitle yang "ditanam" permanen ke video |
 | **Aspect Ratio** | Perbandingan lebar:tinggi video (9:16, 1:1, 16:9) |
 | **Dry Run** | Menjalankan preview tanpa benar-benar memproses |
-| **Transcriber** | Provider untuk speech-to-text (Groq, OpenAI, Local) |
-| **Analyzer** | Provider untuk analisis viral moments (Groq, Gemini, OpenAI, Ollama) |
+| **Transcriber** | Provider untuk speech-to-text (Groq, Deepgram, ElevenLabs, OpenAI, Local) |
+| **Analyzer** | Provider untuk analisis viral moments (Groq, DeepSeek, Gemini, Mistral, OpenAI, Ollama) |
 | **H.264** | Codec video standar untuk kompatibilitas tinggi |
 | **AAC** | Codec audio standar untuk kompatibilitas tinggi |
 | **ASS** | Format subtitle dengan styling (Advanced SubStation Alpha) |
@@ -814,6 +828,10 @@ sclip [options]
 | `--transcriber` | - | `groq` | Provider transcription |
 | `--analyzer` | - | `groq` | Provider analysis |
 | `--groq-api-key` | - | env var | Groq API key |
+| `--deepgram-api-key` | - | env var | Deepgram API key |
+| `--elevenlabs-api-key` | - | env var | ElevenLabs API key |
+| `--deepseek-api-key` | - | env var | DeepSeek API key |
+| `--mistral-api-key` | - | env var | Mistral API key |
 | `--gemini-api-key` | - | env var | Gemini API key |
 | `--openai-api-key` | - | env var | OpenAI API key |
 | `--transcriber-model` | - | auto | Model transcription |
@@ -844,6 +862,10 @@ Sebagai patokan, video 30 menit biasanya membutuhkan 3-10 menit untuk diproses s
 
 A: SmartClip sendiri gratis dan open-source. Untuk provider:
 - **Groq (Default)**: 100% GRATIS dengan rate limit
+- **Deepgram**: $200 free credit untuk akun baru
+- **ElevenLabs**: Berbayar, 99 bahasa
+- **DeepSeek**: Sangat murah
+- **Mistral**: Free tier tersedia
 - **Gemini**: Free tier tersedia
 - **OpenAI**: Berbayar
 - **Ollama + Local Whisper**: Gratis, offline, butuh hardware yang cukup
@@ -879,8 +901,12 @@ A:
 
 A:
 - **Groq (Default)**: GRATIS, cepat, recommended untuk kebanyakan pengguna
-- **OpenAI**: Berbayar, kualitas tinggi
+- **Deepgram**: $200 free credit, sangat cepat, akurat
+- **ElevenLabs**: 99 bahasa, akurasi tinggi
+- **DeepSeek**: Sangat murah, kualitas bagus
+- **Mistral**: Free tier tersedia, bagus untuk Eropa
 - **Gemini**: Free tier tersedia, context window besar
+- **OpenAI**: Berbayar, kualitas tinggi
 - **Ollama**: Offline, butuh GPU untuk performa optimal
 - **Local Whisper**: Offline transcription, lebih lambat di CPU
 

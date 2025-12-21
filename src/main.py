@@ -54,7 +54,7 @@ import click
 
 from src.types import CLIOptions, ExitCode, AspectRatio, CaptionStyle, TranscriberProvider, AnalyzerProvider
 from src.utils.cleanup import setup_cleanup_context, setup_signal_handlers
-from src.utils.config import get_api_key, get_ffmpeg_path, get_groq_api_key, get_openai_api_key, get_gemini_api_key, load_config
+from src.utils.config import get_api_key, get_ffmpeg_path, get_groq_api_key, get_openai_api_key, get_gemini_api_key, get_deepgram_api_key, get_deepseek_api_key, get_elevenlabs_api_key, get_mistral_api_key, load_config
 from src.utils.logger import setup_logger, get_logger
 
 
@@ -206,14 +206,14 @@ def version_callback(ctx: click.Context, param: click.Parameter, value: bool) ->
 )
 @click.option(
     "--transcriber",
-    type=click.Choice(["groq", "openai", "local"]),
+    type=click.Choice(["groq", "openai", "deepgram", "elevenlabs", "local"]),
     default="groq",
     show_default=True,
-    help="Transcription provider (groq=free Whisper API, openai=OpenAI Whisper, local=faster-whisper)",
+    help="Transcription provider (groq=free Whisper API, openai=OpenAI Whisper, deepgram=Deepgram Nova, elevenlabs=ElevenLabs Scribe, local=faster-whisper)",
 )
 @click.option(
     "--analyzer",
-    type=click.Choice(["groq", "gemini", "openai", "ollama"]),
+    type=click.Choice(["groq", "deepseek", "gemini", "openai", "mistral", "ollama"]),
     default="groq",
     show_default=True,
     help="Analysis provider for viral moment detection",
@@ -240,6 +240,34 @@ def version_callback(ctx: click.Context, param: click.Parameter, value: bool) ->
     help="Gemini API key (or set GEMINI_API_KEY env var)",
 )
 @click.option(
+    "--deepgram-api-key",
+    type=str,
+    default=None,
+    envvar="DEEPGRAM_API_KEY",
+    help="Deepgram API key (or set DEEPGRAM_API_KEY env var) - $200 free credit",
+)
+@click.option(
+    "--deepseek-api-key",
+    type=str,
+    default=None,
+    envvar="DEEPSEEK_API_KEY",
+    help="DeepSeek API key (or set DEEPSEEK_API_KEY env var) - very affordable",
+)
+@click.option(
+    "--elevenlabs-api-key",
+    type=str,
+    default=None,
+    envvar="ELEVENLABS_API_KEY",
+    help="ElevenLabs API key (or set ELEVENLABS_API_KEY env var) - 99 languages",
+)
+@click.option(
+    "--mistral-api-key",
+    type=str,
+    default=None,
+    envvar="MISTRAL_API_KEY",
+    help="Mistral API key (or set MISTRAL_API_KEY env var) - free tier available",
+)
+@click.option(
     "--transcriber-model",
     type=str,
     default=None,
@@ -249,7 +277,7 @@ def version_callback(ctx: click.Context, param: click.Parameter, value: bool) ->
     "--analyzer-model",
     type=str,
     default=None,
-    help="Model for analysis (default: llama-3.3-70b-versatile for Groq)",
+    help="Model for analysis (default: openai/gpt-oss-120b for Groq)",
 )
 @click.option(
     "--ollama-host",
@@ -311,6 +339,10 @@ def main(
     groq_api_key: Optional[str],
     openai_api_key: Optional[str],
     gemini_api_key: Optional[str],
+    deepgram_api_key: Optional[str],
+    deepseek_api_key: Optional[str],
+    elevenlabs_api_key: Optional[str],
+    mistral_api_key: Optional[str],
     transcriber_model: Optional[str],
     analyzer_model: Optional[str],
     ollama_host: str,
@@ -327,23 +359,31 @@ def main(
       sclip -i video.mp4 --dry-run            # Preview without rendering
       sclip -i video.mp4 -n 3 -a 1:1          # 3 clips, square format
       sclip -i video.mp4 --analyzer gemini    # Use Gemini for analysis
+      sclip -i video.mp4 --analyzer deepseek  # Use DeepSeek (very affordable)
+      sclip -i video.mp4 --analyzer mistral   # Use Mistral (free tier)
+      sclip -i video.mp4 --transcriber elevenlabs  # Use ElevenLabs (99 languages)
+      sclip -i video.mp4 --transcriber deepgram  # Use Deepgram ($200 free)
       sclip -i video.mp4 --transcriber local --analyzer ollama  # Fully offline
       sclip --check-deps                      # Check dependencies
       sclip --setup                           # Run setup wizard
     
     \b
     Provider Options:
-      --transcriber groq     Groq Whisper API (free, fast)
-      --transcriber openai   OpenAI Whisper API
-      --transcriber local    Local faster-whisper (offline)
+      --transcriber groq      Groq Whisper API (free, fast) [DEFAULT]
+      --transcriber openai    OpenAI Whisper API
+      --transcriber deepgram  Deepgram Nova ($200 free credit)
+      --transcriber elevenlabs ElevenLabs Scribe (99 languages)
+      --transcriber local     Local faster-whisper (offline)
       
-      --analyzer groq        Groq LLMs (free, fast)
-      --analyzer gemini      Google Gemini
-      --analyzer openai      OpenAI GPT-4
-      --analyzer ollama      Local Ollama (offline)
+      --analyzer groq         Groq LLMs (free, fast) [DEFAULT]
+      --analyzer deepseek     DeepSeek LLMs (very affordable)
+      --analyzer gemini       Google Gemini
+      --analyzer openai       OpenAI GPT-4
+      --analyzer mistral      Mistral AI (free tier available)
+      --analyzer ollama       Local Ollama (offline)
     
     \b
-    For more information, visit: https://github.com/sarian/sclip
+    For more information, visit: https://github.com/sakirsyarian/sclip
     """
     # Setup logger first
     logger = setup_logger(verbose=verbose, quiet=quiet)
@@ -372,6 +412,10 @@ def main(
         resolved_groq_key = get_groq_api_key(groq_api_key)
         resolved_openai_key = get_openai_api_key(openai_api_key)
         resolved_gemini_key = get_gemini_api_key(gemini_api_key or api_key)
+        resolved_deepgram_key = get_deepgram_api_key(deepgram_api_key)
+        resolved_deepseek_key = get_deepseek_api_key(deepseek_api_key)
+        resolved_elevenlabs_key = get_elevenlabs_api_key(elevenlabs_api_key)
+        resolved_mistral_key = get_mistral_api_key(mistral_api_key)
         
         options = CLIOptions(
             url=url,
@@ -397,6 +441,10 @@ def main(
             groq_api_key=resolved_groq_key,
             openai_api_key=resolved_openai_key,
             gemini_api_key=resolved_gemini_key,
+            deepgram_api_key=resolved_deepgram_key,
+            deepseek_api_key=resolved_deepseek_key,
+            elevenlabs_api_key=resolved_elevenlabs_key,
+            mistral_api_key=resolved_mistral_key,
             transcriber_model=transcriber_model,
             analyzer_model=analyzer_model,
             ollama_host=ollama_host,

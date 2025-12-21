@@ -78,9 +78,9 @@ dev = [
 sclip = "src.main:main"
 
 [project.urls]
-Homepage = "https://github.com/sarian/sclip"
-Repository = "https://github.com/sarian/sclip"
-Issues = "https://github.com/sarian/sclip/issues"
+Homepage = "https://github.com/sakirsyarian/sclip"
+Repository = "https://github.com/sakirsyarian/sclip"
+Issues = "https://github.com/sakirsyarian/sclip/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]

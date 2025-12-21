@@ -10,8 +10,8 @@ SmartClip AI (`sclip`) is a Python CLI tool that transforms long-form videos (po
 
 - **Language**: Python 3.10+
 - **CLI Framework**: Click
-- **Transcription**: Groq Whisper (default), OpenAI Whisper, Local faster-whisper
-- **Analysis**: Groq LLMs (default), Gemini, OpenAI GPT, Ollama
+- **Transcription**: Groq Whisper (default), Deepgram Nova, ElevenLabs Scribe, OpenAI Whisper, Local faster-whisper
+- **Analysis**: Groq LLMs (default), DeepSeek, Gemini, OpenAI GPT, Mistral, Ollama
 - **Video Processing**: FFmpeg (external dependency)
 - **YouTube Downloads**: yt-dlp
 - **Console Output**: Rich library
@@ -34,13 +34,17 @@ src/
 │   │   ├── base.py      # BaseTranscriber abstract class
 │   │   ├── groq.py      # Groq Whisper API
 │   │   ├── openai.py    # OpenAI Whisper API
+│   │   ├── deepgram.py  # Deepgram Nova API
+│   │   ├── elevenlabs.py # ElevenLabs Scribe API
 │   │   └── local.py     # Local faster-whisper
 │   └── analyzers/       # Analysis providers
 │       ├── __init__.py  # Factory function get_analyzer()
 │       ├── base.py      # BaseAnalyzer abstract class
 │       ├── groq.py      # Groq LLMs (Llama 3.3, etc.)
+│       ├── deepseek.py  # DeepSeek LLMs
 │       ├── gemini.py    # Google Gemini
 │       ├── openai.py    # OpenAI GPT-4
+│       ├── mistral.py   # Mistral AI
 │       └── ollama.py    # Local Ollama
 ├── utils/               # Utility modules
 │   ├── captions.py      # ASS subtitle generation
@@ -103,8 +107,8 @@ class ExitCode(IntEnum):
 # Type aliases
 AspectRatio = Literal["9:16", "1:1", "16:9"]
 CaptionStyle = Literal["default", "bold", "minimal", "karaoke"]
-TranscriberProvider = Literal["groq", "openai", "local"]
-AnalyzerProvider = Literal["groq", "gemini", "openai", "ollama"]
+TranscriberProvider = Literal["groq", "openai", "deepgram", "elevenlabs", "local"]
+AnalyzerProvider = Literal["groq", "deepseek", "gemini", "openai", "mistral", "ollama"]
 
 # Main dataclasses
 @dataclass
@@ -126,6 +130,10 @@ class CLIOptions:
     groq_api_key: str | None
     openai_api_key: str | None
     gemini_api_key: str | None
+    deepgram_api_key: str | None
+    deepseek_api_key: str | None
+    elevenlabs_api_key: str | None
+    mistral_api_key: str | None
     transcriber_model: str | None
     analyzer_model: str | None
     ollama_host: str
@@ -146,7 +154,9 @@ Factory: `get_transcriber(provider, api_key, model) -> BaseTranscriber`
 | Provider | Class | Default Model | Features |
 |----------|-------|---------------|----------|
 | groq | GroqTranscriber | whisper-large-v3-turbo | Free, fast, 25MB limit |
+| deepgram | DeepgramTranscriber | nova-3 | $200 free credit, very fast |
 | openai | OpenAITranscriber | whisper-1 | Paid, 25MB limit |
+| elevenlabs | ElevenLabsTranscriber | scribe_v1 | 99 languages, word timestamps |
 | local | LocalTranscriber | base | Offline, no limit |
 
 ```python
@@ -163,9 +173,11 @@ Factory: `get_analyzer(provider, api_key, model, **kwargs) -> BaseAnalyzer`
 
 | Provider | Class | Default Model | Features |
 |----------|-------|---------------|----------|
-| groq | GroqAnalyzer | llama-3.3-70b-versatile | Free, very fast |
+| groq | GroqAnalyzer | openai/gpt-oss-120b | Free, very fast |
+| deepseek | DeepSeekAnalyzer | deepseek-chat | Very affordable |
 | gemini | GeminiAnalyzer | gemini-2.0-flash | Free tier, large context |
 | openai | OpenAIAnalyzer | gpt-4o-mini | Paid, high quality |
+| mistral | MistralAnalyzer | mistral-small-latest | Free tier available |
 | ollama | OllamaAnalyzer | llama3.2 | Offline, local |
 
 ```python
@@ -225,8 +237,12 @@ API key priority: CLI flag → Environment variable → Config file
 
 Environment variables:
 - `GROQ_API_KEY` - Groq API key (transcription + analysis)
+- `DEEPGRAM_API_KEY` - Deepgram API key ($200 free credit)
+- `ELEVENLABS_API_KEY` - ElevenLabs API key (99 languages)
+- `DEEPSEEK_API_KEY` - DeepSeek API key (very affordable)
 - `GEMINI_API_KEY` - Google Gemini API key
 - `OPENAI_API_KEY` - OpenAI API key
+- `MISTRAL_API_KEY` - Mistral API key (free tier available)
 - `OLLAMA_HOST` - Ollama server URL (default: http://localhost:11434)
 
 ## Common Development Tasks
@@ -269,8 +285,11 @@ Required:
 
 Optional:
 - yt-dlp (for YouTube support)
+- deepgram-sdk (for Deepgram transcriber)
+- elevenlabs (for ElevenLabs transcriber)
 - google-genai (for Gemini analyzer)
-- openai (for OpenAI transcriber/analyzer)
+- openai (for OpenAI/DeepSeek transcriber/analyzer)
+- mistralai (for Mistral analyzer)
 - faster-whisper (for local transcription)
 - httpx (for Ollama analyzer)
 

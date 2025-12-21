@@ -198,6 +198,12 @@ def _validate_provider_keys(options: CLIOptions) -> str | None:
     if options.transcriber == "openai" and not options.openai_api_key:
         return "OpenAI API key required for transcription. Set OPENAI_API_KEY or use --openai-api-key"
     
+    if options.transcriber == "deepgram" and not options.deepgram_api_key:
+        return "Deepgram API key required for transcription. Set DEEPGRAM_API_KEY or use --deepgram-api-key. Get $200 free credit at https://deepgram.com"
+    
+    if options.transcriber == "elevenlabs" and not options.elevenlabs_api_key:
+        return "ElevenLabs API key required for transcription. Set ELEVENLABS_API_KEY or use --elevenlabs-api-key. Get API key at https://elevenlabs.io"
+    
     # Check analyzer API key
     if options.analyzer == "groq" and not options.groq_api_key:
         return "Groq API key required for analysis. Set GROQ_API_KEY or use --groq-api-key"
@@ -207,6 +213,12 @@ def _validate_provider_keys(options: CLIOptions) -> str | None:
     
     if options.analyzer == "openai" and not options.openai_api_key:
         return "OpenAI API key required for analysis. Set OPENAI_API_KEY or use --openai-api-key"
+    
+    if options.analyzer == "deepseek" and not options.deepseek_api_key:
+        return "DeepSeek API key required for analysis. Set DEEPSEEK_API_KEY or use --deepseek-api-key. Get API key at https://platform.deepseek.com"
+    
+    if options.analyzer == "mistral" and not options.mistral_api_key:
+        return "Mistral API key required for analysis. Set MISTRAL_API_KEY or use --mistral-api-key. Get API key at https://console.mistral.ai"
     
     # Local providers don't need API keys
     # ollama and local transcriber work without keys
@@ -322,6 +334,10 @@ async def _transcribe_audio(audio_path: str, options: CLIOptions):
             api_key = options.groq_api_key
         elif options.transcriber == "openai":
             api_key = options.openai_api_key
+        elif options.transcriber == "deepgram":
+            api_key = options.deepgram_api_key
+        elif options.transcriber == "elevenlabs":
+            api_key = options.elevenlabs_api_key
         
         transcriber = get_transcriber(
             provider=options.transcriber,
@@ -370,6 +386,10 @@ async def _analyze_transcript(
             api_key = options.gemini_api_key
         elif options.analyzer == "openai":
             api_key = options.openai_api_key
+        elif options.analyzer == "deepseek":
+            api_key = options.deepseek_api_key
+        elif options.analyzer == "mistral":
+            api_key = options.mistral_api_key
         elif options.analyzer == "ollama":
             extra_kwargs["host"] = options.ollama_host
         

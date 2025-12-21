@@ -1,15 +1,15 @@
-"""Groq LLM analysis service.
+"""DeepSeek LLM analysis service.
 
-Uses Groq's fast LLM API for viral moment analysis.
-Free tier available with generous limits.
+Uses DeepSeek's API for viral moment analysis.
+Very affordable pricing ($0.028-0.28/M tokens).
+OpenAI-compatible API.
 
-API Documentation: https://console.groq.com/docs/text-chat
+API Documentation: https://api-docs.deepseek.com/
 """
 
 import asyncio
 import json
 import os
-import re
 from typing import Callable
 
 from src.services.transcribers.base import TranscriptionResult
@@ -26,51 +26,49 @@ from .base import (
 )
 
 
-class GroqAnalyzer(BaseAnalyzer):
-    """Groq LLM analysis service.
+class DeepSeekAnalyzer(BaseAnalyzer):
+    """DeepSeek LLM analysis service.
     
     Features:
-    - Very fast inference (fastest available)
-    - Free tier available
-    - Multiple model options
+    - Very affordable pricing
+    - OpenAI-compatible API
+    - High quality reasoning (DeepSeek-V3)
+    - Reasoning model available (deepseek-reasoner)
     
     Models:
-    - openai/gpt-oss-120b: OpenAI's open source model (best)
-    - llama-3.3-70b-versatile: Meta's Llama 3.3
-    - llama-3.1-70b-versatile: Meta's Llama 3.1
-    - mixtral-8x7b-32768: Mistral's MoE model
+    - deepseek-chat: Latest V3 model, best for general use (default)
+    - deepseek-reasoner: R1 reasoning model, for complex analysis
     """
     
     SUPPORTED_MODELS = [
-        "openai/gpt-oss-120b",
-        "llama-3.3-70b-versatile",
-        "llama-3.1-70b-versatile",
-        "mixtral-8x7b-32768",
-        "gemma2-9b-it",
+        "deepseek-chat",      # DeepSeek-V3, general purpose
+        "deepseek-reasoner",  # DeepSeek-R1, reasoning
     ]
+    
+    API_BASE_URL = "https://api.deepseek.com"
     
     @property
     def name(self) -> str:
-        return "Groq"
+        return "DeepSeek"
     
     @property
     def default_model(self) -> str:
-        return "openai/gpt-oss-120b"
+        return "deepseek-chat"
     
     def is_available(self) -> bool:
-        """Check if Groq API key is available."""
-        return bool(self.api_key or os.environ.get("GROQ_API_KEY"))
+        """Check if DeepSeek API key is available."""
+        return bool(self.api_key or os.environ.get("DEEPSEEK_API_KEY"))
     
     def _get_api_key(self) -> str:
         """Get API key from instance or environment."""
-        key = self.api_key or os.environ.get("GROQ_API_KEY")
+        key = self.api_key or os.environ.get("DEEPSEEK_API_KEY")
         if not key:
             raise AnalysisAPIError(
-                "Groq API key not found. Set GROQ_API_KEY environment variable "
-                "or pass api_key parameter."
+                "DeepSeek API key not found. Set DEEPSEEK_API_KEY environment variable "
+                "or pass api_key parameter. Get API key at https://platform.deepseek.com"
             )
         return key
-    
+
     async def analyze(
         self,
         transcription: TranscriptionResult,
@@ -81,7 +79,7 @@ class GroqAnalyzer(BaseAnalyzer):
         language: str = "id",
         progress_callback: Callable[[str], None] | None = None
     ) -> AnalysisResult:
-        """Analyze transcript using Groq LLM.
+        """Analyze transcript using DeepSeek LLM.
         
         Args:
             transcription: TranscriptionResult with text and timestamps
@@ -100,17 +98,22 @@ class GroqAnalyzer(BaseAnalyzer):
                 progress_callback(msg)
         
         try:
-            from groq import Groq
+            from openai import OpenAI
         except ImportError:
             raise AnalysisError(
-                "Groq SDK not installed. Install with: pip install groq"
+                "OpenAI SDK not installed. Install with: pip install openai"
             )
         
         api_key = self._get_api_key()
-        client = Groq(api_key=api_key)
+        
+        # DeepSeek uses OpenAI-compatible API
+        client = OpenAI(
+            api_key=api_key,
+            base_url=self.API_BASE_URL
+        )
         
         model = self.get_model()
-        update_progress(f"Analyzing with {model}...")
+        update_progress(f"Analyzing with DeepSeek {model}...")
         
         # Format transcript with timestamps
         formatted_transcript = format_transcript_with_timestamps(transcription)
@@ -136,11 +139,13 @@ class GroqAnalyzer(BaseAnalyzer):
         except Exception as e:
             error_msg = str(e)
             if "401" in error_msg or "unauthorized" in error_msg.lower():
-                raise AnalysisAPIError("Invalid Groq API key")
+                raise AnalysisAPIError("Invalid DeepSeek API key")
             elif "429" in error_msg or "rate" in error_msg.lower():
-                raise AnalysisAPIError("Groq rate limit exceeded. Please wait and try again.")
+                raise AnalysisAPIError("DeepSeek rate limit exceeded. Please wait and try again.")
+            elif "insufficient" in error_msg.lower() or "balance" in error_msg.lower():
+                raise AnalysisAPIError("DeepSeek account has insufficient balance.")
             else:
-                raise AnalysisAPIError(f"Groq API error: {error_msg}")
+                raise AnalysisAPIError(f"DeepSeek API error: {error_msg}")
         
         update_progress("Parsing analysis results...")
         
@@ -172,7 +177,7 @@ class GroqAnalyzer(BaseAnalyzer):
         )
         
         return response.choices[0].message.content
-    
+
     def _parse_response(
         self, 
         response_text: str, 

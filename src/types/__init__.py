@@ -68,18 +68,22 @@ CaptionStyle = Literal["default", "bold", "minimal", "karaoke"]
 
 
 # Type aliases for provider options
-TranscriberProvider = Literal["groq", "openai", "local"]
+TranscriberProvider = Literal["groq", "openai", "deepgram", "elevenlabs", "local"]
 """Supported transcription providers.
-- "groq": Groq Whisper API (fast, free tier)
+- "groq": Groq Whisper API (fast, free tier) - default
 - "openai": OpenAI Whisper API
+- "deepgram": Deepgram Nova API ($200 free credit)
+- "elevenlabs": ElevenLabs Scribe (99 languages)
 - "local": Local faster-whisper (offline)
 """
 
-AnalyzerProvider = Literal["groq", "gemini", "openai", "ollama"]
+AnalyzerProvider = Literal["groq", "deepseek", "gemini", "openai", "mistral", "ollama"]
 """Supported analysis providers.
-- "groq": Groq LLMs (fast, free tier)
+- "groq": Groq LLMs (fast, free tier) - default
+- "deepseek": DeepSeek LLMs (very affordable)
 - "gemini": Google Gemini
 - "openai": OpenAI GPT-4
+- "mistral": Mistral AI (free tier available)
 - "ollama": Local LLMs (offline)
 """
 
@@ -144,6 +148,10 @@ class CLIOptions:
     groq_api_key: str | None = None
     openai_api_key: str | None = None
     gemini_api_key: str | None = None
+    deepgram_api_key: str | None = None
+    deepseek_api_key: str | None = None
+    elevenlabs_api_key: str | None = None
+    mistral_api_key: str | None = None
     transcriber_model: str | None = None
     analyzer_model: str | None = None
     ollama_host: str = "http://localhost:11434"
@@ -290,6 +298,10 @@ class Config:
     groq_api_key: str | None = None
     openai_api_key: str | None = None
     gemini_api_key: str | None = None
+    deepgram_api_key: str | None = None
+    deepseek_api_key: str | None = None
+    elevenlabs_api_key: str | None = None
+    mistral_api_key: str | None = None
     
     # Provider defaults
     default_transcriber: TranscriberProvider = "groq"

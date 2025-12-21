@@ -7,12 +7,16 @@ rich>=13.0.0
 yt-dlp>=2024.1.0
 
 # Transcription providers
-groq>=0.4.0                    # Groq Whisper API (free, fast)
+groq>=0.4.0                    # Groq Whisper API (free, fast) - DEFAULT
 openai>=1.0.0                  # OpenAI Whisper API (optional)
+deepgram-sdk>=3.0.0            # Deepgram Nova API ($200 free credit)
+elevenlabs>=1.0.0              # ElevenLabs Scribe (99 languages)
 faster-whisper>=1.0.0          # Local Whisper (optional, for offline)
 
 # Analysis providers
+# openai is also used for DeepSeek (OpenAI-compatible API)
 google-genai>=1.0.0            # Google Gemini (optional)
+mistralai>=1.0.0               # Mistral AI (free tier available)
 httpx>=0.25.0                  # For Ollama API calls
 
 # Face tracking (optional but recommended)

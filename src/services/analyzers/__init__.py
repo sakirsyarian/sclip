@@ -1,9 +1,11 @@
 """Analysis services for SmartClip AI.
 
 This module provides multiple LLM backends for viral moment analysis:
-- Groq: Fast, free LLMs (GPT OSS 120B, Llama 3.3)
+- Groq: Fast, free LLMs (Llama 3.3) - default
+- DeepSeek: Very affordable LLMs (DeepSeek-V3)
 - Gemini: Google's Gemini Flash
 - OpenAI: GPT-4o
+- Mistral: Mistral AI (free tier available)
 - Ollama: Local LLMs
 
 Usage:
@@ -18,6 +20,8 @@ from .groq import GroqAnalyzer
 from .gemini import GeminiAnalyzer
 from .openai import OpenAIAnalyzer
 from .ollama import OllamaAnalyzer
+from .deepseek import DeepSeekAnalyzer
+from .mistral import MistralAnalyzer
 
 
 def get_analyzer(
@@ -29,7 +33,7 @@ def get_analyzer(
     """Factory function to get an analyzer instance.
     
     Args:
-        provider: Analysis provider ("groq", "gemini", "openai", "ollama")
+        provider: Analysis provider ("groq", "deepseek", "gemini", "openai", "mistral", "ollama")
         api_key: API key for cloud providers
         model: Model name to use
         **kwargs: Additional provider-specific arguments
@@ -42,8 +46,10 @@ def get_analyzer(
     """
     providers = {
         "groq": GroqAnalyzer,
+        "deepseek": DeepSeekAnalyzer,
         "gemini": GeminiAnalyzer,
         "openai": OpenAIAnalyzer,
+        "mistral": MistralAnalyzer,
         "ollama": OllamaAnalyzer,
     }
     
@@ -57,8 +63,10 @@ __all__ = [
     "BaseAnalyzer",
     "AnalysisResult",
     "GroqAnalyzer",
+    "DeepSeekAnalyzer",
     "GeminiAnalyzer",
     "OpenAIAnalyzer",
+    "MistralAnalyzer",
     "OllamaAnalyzer",
     "get_analyzer",
 ]

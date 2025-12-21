@@ -1,15 +1,14 @@
-"""Groq LLM analysis service.
+"""Mistral AI LLM analysis service.
 
-Uses Groq's fast LLM API for viral moment analysis.
+Uses Mistral's API for viral moment analysis.
 Free tier available with generous limits.
 
-API Documentation: https://console.groq.com/docs/text-chat
+API Documentation: https://docs.mistral.ai/
 """
 
 import asyncio
 import json
 import os
-import re
 from typing import Callable
 
 from src.services.transcribers.base import TranscriptionResult
@@ -26,51 +25,53 @@ from .base import (
 )
 
 
-class GroqAnalyzer(BaseAnalyzer):
-    """Groq LLM analysis service.
+class MistralAnalyzer(BaseAnalyzer):
+    """Mistral AI LLM analysis service.
     
     Features:
-    - Very fast inference (fastest available)
     - Free tier available
+    - Fast inference
     - Multiple model options
+    - Good multilingual support
     
     Models:
-    - openai/gpt-oss-120b: OpenAI's open source model (best)
-    - llama-3.3-70b-versatile: Meta's Llama 3.3
-    - llama-3.1-70b-versatile: Meta's Llama 3.1
-    - mixtral-8x7b-32768: Mistral's MoE model
+    - mistral-large-latest: Best quality, most capable
+    - mistral-medium-latest: Balanced quality/speed
+    - mistral-small-latest: Fast, efficient (default)
+    - open-mistral-nemo: Open source, good quality
     """
     
     SUPPORTED_MODELS = [
-        "openai/gpt-oss-120b",
-        "llama-3.3-70b-versatile",
-        "llama-3.1-70b-versatile",
-        "mixtral-8x7b-32768",
-        "gemma2-9b-it",
+        "mistral-large-latest",
+        "mistral-medium-latest",
+        "mistral-small-latest",
+        "open-mistral-nemo",
+        "open-mixtral-8x22b",
+        "open-mixtral-8x7b",
     ]
     
     @property
     def name(self) -> str:
-        return "Groq"
+        return "Mistral"
     
     @property
     def default_model(self) -> str:
-        return "openai/gpt-oss-120b"
+        return "mistral-small-latest"
     
     def is_available(self) -> bool:
-        """Check if Groq API key is available."""
-        return bool(self.api_key or os.environ.get("GROQ_API_KEY"))
+        """Check if Mistral API key is available."""
+        return bool(self.api_key or os.environ.get("MISTRAL_API_KEY"))
     
     def _get_api_key(self) -> str:
         """Get API key from instance or environment."""
-        key = self.api_key or os.environ.get("GROQ_API_KEY")
+        key = self.api_key or os.environ.get("MISTRAL_API_KEY")
         if not key:
             raise AnalysisAPIError(
-                "Groq API key not found. Set GROQ_API_KEY environment variable "
-                "or pass api_key parameter."
+                "Mistral API key not found. Set MISTRAL_API_KEY environment variable "
+                "or pass api_key parameter. Get API key at https://console.mistral.ai"
             )
         return key
-    
+
     async def analyze(
         self,
         transcription: TranscriptionResult,
@@ -81,7 +82,7 @@ class GroqAnalyzer(BaseAnalyzer):
         language: str = "id",
         progress_callback: Callable[[str], None] | None = None
     ) -> AnalysisResult:
-        """Analyze transcript using Groq LLM.
+        """Analyze transcript using Mistral LLM.
         
         Args:
             transcription: TranscriptionResult with text and timestamps
@@ -100,17 +101,17 @@ class GroqAnalyzer(BaseAnalyzer):
                 progress_callback(msg)
         
         try:
-            from groq import Groq
+            from mistralai import Mistral
         except ImportError:
             raise AnalysisError(
-                "Groq SDK not installed. Install with: pip install groq"
+                "Mistral SDK not installed. Install with: pip install mistralai"
             )
         
         api_key = self._get_api_key()
-        client = Groq(api_key=api_key)
+        client = Mistral(api_key=api_key)
         
         model = self.get_model()
-        update_progress(f"Analyzing with {model}...")
+        update_progress(f"Analyzing with Mistral {model}...")
         
         # Format transcript with timestamps
         formatted_transcript = format_transcript_with_timestamps(transcription)
@@ -136,11 +137,11 @@ class GroqAnalyzer(BaseAnalyzer):
         except Exception as e:
             error_msg = str(e)
             if "401" in error_msg or "unauthorized" in error_msg.lower():
-                raise AnalysisAPIError("Invalid Groq API key")
+                raise AnalysisAPIError("Invalid Mistral API key")
             elif "429" in error_msg or "rate" in error_msg.lower():
-                raise AnalysisAPIError("Groq rate limit exceeded. Please wait and try again.")
+                raise AnalysisAPIError("Mistral rate limit exceeded. Please wait and try again.")
             else:
-                raise AnalysisAPIError(f"Groq API error: {error_msg}")
+                raise AnalysisAPIError(f"Mistral API error: {error_msg}")
         
         update_progress("Parsing analysis results...")
         
@@ -155,7 +156,7 @@ class GroqAnalyzer(BaseAnalyzer):
     
     def _do_analyze(self, client, model: str, prompt: str) -> str:
         """Perform the actual analysis (synchronous)."""
-        response = client.chat.completions.create(
+        response = client.chat.complete(
             model=model,
             messages=[
                 {
@@ -172,7 +173,7 @@ class GroqAnalyzer(BaseAnalyzer):
         )
         
         return response.choices[0].message.content
-    
+
     def _parse_response(
         self, 
         response_text: str, 
@@ -229,7 +230,6 @@ class GroqAnalyzer(BaseAnalyzer):
     
     def _fix_json(self, json_text: str) -> str:
         """Fix common JSON issues."""
-        # Remove invalid escape sequences
         result = []
         i = 0
         while i < len(json_text):
@@ -260,9 +260,7 @@ class GroqAnalyzer(BaseAnalyzer):
         captions: list[CaptionSegment] = []
         
         for word in transcription.words:
-            # Check if word falls within the clip range
             if word.start >= start_time and word.end <= end_time:
-                # Adjust timestamps relative to clip start
                 captions.append(CaptionSegment(
                     start=word.start - start_time,
                     end=word.end - start_time,

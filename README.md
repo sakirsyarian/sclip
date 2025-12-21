@@ -29,6 +29,8 @@ Video → Extract Audio → Transcribe (Whisper) → Analyze (LLM) → Render
 | Provider | Speed | Cost | Offline |
 |----------|-------|------|---------|
 | Groq Whisper | ⚡ Very Fast | Free | ❌ |
+| Deepgram Nova | ⚡ Very Fast | $200 free credit | ❌ |
+| ElevenLabs Scribe | Fast | Paid | ❌ |
 | OpenAI Whisper | Fast | $0.006/min | ❌ |
 | Local (faster-whisper) | Depends on HW | Free | ✅ |
 
@@ -36,8 +38,10 @@ Video → Extract Audio → Transcribe (Whisper) → Analyze (LLM) → Render
 | Provider | Speed | Cost | Offline |
 |----------|-------|------|---------|
 | Groq (Llama 3.3) | ⚡ Very Fast | Free | ❌ |
+| DeepSeek | Fast | Very affordable | ❌ |
 | Gemini | Fast | Free tier | ❌ |
 | OpenAI (GPT-4) | Fast | Paid | ❌ |
+| Mistral | Fast | Free tier | ❌ |
 | Ollama | Depends on HW | Free | ✅ |
 
 ## 🚀 Try it on Google Colab (No Installation Required!)
@@ -78,7 +82,7 @@ Tidak perlu install apa-apa! Jalankan SmartClip AI langsung di browser dengan GP
 
 ```bash
 # Clone the repository
-git clone https://github.com/sarian/sclip.git
+git clone https://github.com/sakirsyarian/sclip.git
 cd sclip
 
 # Install with pip (recommended)
@@ -279,13 +283,17 @@ sclip -i video.mp4 --keep-temp
 sclip -i video.mp4
 
 # Use different transcription provider
-sclip -i video.mp4 --transcriber openai    # OpenAI Whisper (paid)
-sclip -i video.mp4 --transcriber local     # Local faster-whisper (offline)
+sclip -i video.mp4 --transcriber openai      # OpenAI Whisper (paid)
+sclip -i video.mp4 --transcriber deepgram    # Deepgram Nova ($200 free credit)
+sclip -i video.mp4 --transcriber elevenlabs  # ElevenLabs Scribe (99 languages)
+sclip -i video.mp4 --transcriber local       # Local faster-whisper (offline)
 
 # Use different analysis provider
-sclip -i video.mp4 --analyzer gemini       # Google Gemini
-sclip -i video.mp4 --analyzer openai       # OpenAI GPT-4 (paid)
-sclip -i video.mp4 --analyzer ollama       # Local Ollama (offline)
+sclip -i video.mp4 --analyzer deepseek       # DeepSeek (very affordable)
+sclip -i video.mp4 --analyzer gemini         # Google Gemini
+sclip -i video.mp4 --analyzer mistral        # Mistral AI (free tier)
+sclip -i video.mp4 --analyzer openai         # OpenAI GPT-4 (paid)
+sclip -i video.mp4 --analyzer ollama         # Local Ollama (offline)
 
 # Fully offline mode
 sclip -i video.mp4 --transcriber local --analyzer ollama
@@ -377,11 +385,15 @@ sclip [OPTIONS]
 
 | Flag | Alias | Default | Description |
 |------|-------|---------|-------------|
-| `--transcriber` | | `groq` | Transcription provider: `groq`, `openai`, `local` |
-| `--analyzer` | | `groq` | Analysis provider: `groq`, `gemini`, `openai`, `ollama` |
+| `--transcriber` | | `groq` | Transcription provider: `groq`, `openai`, `deepgram`, `elevenlabs`, `local` |
+| `--analyzer` | | `groq` | Analysis provider: `groq`, `deepseek`, `gemini`, `openai`, `mistral`, `ollama` |
 | `--groq-api-key` | | env var | Groq API key |
 | `--openai-api-key` | | env var | OpenAI API key |
 | `--gemini-api-key` | | env var | Gemini API key |
+| `--deepgram-api-key` | | env var | Deepgram API key ($200 free credit) |
+| `--deepseek-api-key` | | env var | DeepSeek API key (very affordable) |
+| `--elevenlabs-api-key` | | env var | ElevenLabs API key (99 languages) |
+| `--mistral-api-key` | | env var | Mistral API key (free tier) |
 | `--transcriber-model` | | auto | Model for transcription |
 | `--analyzer-model` | | auto | Model for analysis |
 | `--ollama-host` | | `localhost:11434` | Ollama server URL |
@@ -407,14 +419,18 @@ sclip [OPTIONS]
 | Provider | Models | Default |
 |----------|--------|---------|
 | groq | `whisper-large-v3`, `whisper-large-v3-turbo` | `whisper-large-v3-turbo` |
+| deepgram | `nova-3`, `nova-2`, `whisper-large` | `nova-3` |
+| elevenlabs | `scribe_v1` | `scribe_v1` |
 | openai | `whisper-1` | `whisper-1` |
 | local | `tiny`, `base`, `small`, `medium`, `large-v3` | `base` |
 
 **Analysis (LLM):**
 | Provider | Models | Default |
 |----------|--------|---------|
-| groq | `llama-3.3-70b-versatile`, `mixtral-8x7b-32768` | `llama-3.3-70b-versatile` |
+| groq | `openai/gpt-oss-120b`, `llama-3.3-70b-versatile`, `mixtral-8x7b-32768` | `openai/gpt-oss-120b` |
+| deepseek | `deepseek-chat`, `deepseek-reasoner` | `deepseek-chat` |
 | gemini | `gemini-2.0-flash`, `gemini-1.5-pro` | `gemini-2.0-flash` |
+| mistral | `mistral-small-latest`, `mistral-large-latest`, `open-mistral-nemo` | `mistral-small-latest` |
 | openai | `gpt-4o`, `gpt-4o-mini` | `gpt-4o-mini` |
 | ollama | Any installed model | `llama3.2` |
 
@@ -447,6 +463,10 @@ Location: `~/.sclip/config.json`
   "groq_api_key": "your-groq-api-key",
   "openai_api_key": null,
   "gemini_api_key": null,
+  "deepgram_api_key": null,
+  "deepseek_api_key": null,
+  "elevenlabs_api_key": null,
+  "mistral_api_key": null,
   "default_transcriber": "groq",
   "default_analyzer": "groq",
   "default_transcriber_model": null,
@@ -470,6 +490,10 @@ Location: `~/.sclip/config.json`
 | `GROQ_API_KEY` | Groq API key (transcription + analysis) |
 | `GEMINI_API_KEY` | Google Gemini API key |
 | `OPENAI_API_KEY` | OpenAI API key |
+| `DEEPGRAM_API_KEY` | Deepgram API key ($200 free credit) |
+| `DEEPSEEK_API_KEY` | DeepSeek API key (very affordable) |
+| `ELEVENLABS_API_KEY` | ElevenLabs API key (99 languages) |
+| `MISTRAL_API_KEY` | Mistral API key (free tier) |
 | `OLLAMA_HOST` | Ollama server URL (default: http://localhost:11434) |
 | `SCLIP_CONFIG` | Custom config file path |
 | `SCLIP_OUTPUT_DIR` | Default output directory |
@@ -579,7 +603,7 @@ ollama pull llama3.2
 
 ```bash
 # Clone repository
-git clone https://github.com/sarian/sclip.git
+git clone https://github.com/sakirsyarian/sclip.git
 cd sclip
 
 # Create virtual environment

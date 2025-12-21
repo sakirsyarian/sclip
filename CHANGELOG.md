@@ -5,6 +5,91 @@ All notable changes to SmartClip AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.3] - 2024-12-21
+
+### Added
+- **New Transcription Provider: ElevenLabs Scribe**
+  - ElevenLabs Scribe API support for speech-to-text
+  - 99 language support with high accuracy
+  - Word-level timestamps
+  - CLI option: `--transcriber elevenlabs`
+  - Environment variable: `ELEVENLABS_API_KEY`
+
+- **New Analysis Provider: Mistral AI**
+  - Mistral API support for viral moment analysis
+  - Free tier available
+  - Multiple models: `mistral-small-latest`, `mistral-large-latest`, `open-mistral-nemo`
+  - Good multilingual support
+  - CLI option: `--analyzer mistral`
+  - Environment variable: `MISTRAL_API_KEY`
+
+### Changed
+- Updated CLI to support new providers
+- Updated config system with new API key getters
+- Updated documentation with new provider options
+
+### Provider Summary
+**Transcription:**
+| Provider | Cost | Speed |
+|----------|------|-------|
+| Groq (default) | Free | ⚡ Very Fast |
+| Deepgram | $200 free credit | ⚡ Very Fast |
+| ElevenLabs | Paid | Fast |
+| OpenAI | Paid | Fast |
+| Local | Free | Depends on HW |
+
+**Analysis:**
+| Provider | Cost | Speed |
+|----------|------|-------|
+| Groq (default) | Free | ⚡ Very Fast |
+| DeepSeek | Very affordable | Fast |
+| Gemini | Free tier | Fast |
+| OpenAI | Paid | Fast |
+| Mistral | Free tier | Fast |
+| Ollama | Free | Depends on HW |
+
+## [0.2.2] - 2024-12-21
+
+### Added
+- **New Transcription Provider: Deepgram Nova**
+  - Deepgram Nova-3 API support for speech-to-text
+  - $200 free credit for new accounts
+  - Very fast transcription with word-level timestamps
+  - Multi-language support including Indonesian
+  - CLI option: `--transcriber deepgram`
+  - Environment variable: `DEEPGRAM_API_KEY`
+
+- **New Analysis Provider: DeepSeek**
+  - DeepSeek API support for viral moment analysis
+  - Very affordable pricing ($0.028-0.28/M tokens)
+  - OpenAI-compatible API
+  - Models: `deepseek-chat` (V3), `deepseek-reasoner` (R1)
+  - CLI option: `--analyzer deepseek`
+  - Environment variable: `DEEPSEEK_API_KEY`
+
+### Changed
+- Updated CLI to support new providers
+- Updated config system with new API key getters
+- Updated documentation with new provider options
+
+### Provider Summary
+**Transcription:**
+| Provider | Cost | Speed |
+|----------|------|-------|
+| Groq (default) | Free | ⚡ Very Fast |
+| Deepgram | $200 free credit | ⚡ Very Fast |
+| OpenAI | Paid | Fast |
+| Local | Free | Depends on HW |
+
+**Analysis:**
+| Provider | Cost | Speed |
+|----------|------|-------|
+| Groq (default) | Free | ⚡ Very Fast |
+| DeepSeek | Very affordable | Fast |
+| Gemini | Free tier | Fast |
+| OpenAI | Paid | Fast |
+| Ollama | Free | Depends on HW |
+
 ## [0.2.1] - 2024-12-21
 
 ### Changed
@@ -183,5 +268,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Batch processing mode
 - Custom caption templates
 
-[0.2.0]: https://github.com/sarian/sclip/releases/tag/v0.2.0
-[0.1.0]: https://github.com/sarian/sclip/releases/tag/v0.1.0
+[0.2.0]: https://github.com/sakirsyarian/sclip/releases/tag/v0.2.0
+[0.1.0]: https://github.com/sakirsyarian/sclip/releases/tag/v0.1.0

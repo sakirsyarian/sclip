@@ -10,11 +10,12 @@
 2. [Install Python](#2-install-python)
 3. [Setup Project](#3-setup-project)
 4. [Install Dependencies](#4-install-dependencies)
-5. [Dapatkan API Key Gemini](#5-dapatkan-api-key-gemini)
+5. [Dapatkan API Key](#5-dapatkan-api-key)
 6. [Install FFmpeg](#6-install-ffmpeg)
 7. [Menjalankan SmartClip](#7-menjalankan-smartclip)
 8. [Contoh Penggunaan](#8-contoh-penggunaan)
    - [8.1 Multi-Language Support](#81-multi-language-support-dukungan-multi-bahasa)
+   - [8.2 Provider Options](#82-provider-options)
 9. [Troubleshooting](#9-troubleshooting)
 10. [Glossary](#10-glossary)
 11. [FAQ (Frequently Asked Questions)](#11-faq-frequently-asked-questions)
@@ -37,7 +38,7 @@
 1. **Python** - Bahasa pemrograman untuk menjalankan SmartClip
 2. **FFmpeg** - Tool untuk memproses video
 3. **yt-dlp** - Tool untuk download video YouTube (optional)
-4. **Google Gemini API Key** - Untuk AI analysis
+4. **API Key** - Untuk AI transcription dan analysis (Groq GRATIS!)
 
 ---
 
@@ -203,70 +204,68 @@ sclip --help
 
 ---
 
-## 5. Dapatkan API Key Gemini
+## 5. Dapatkan API Key
 
-### Step 1: Buka Google AI Studio
+SmartClip AI mendukung beberapa provider. **Groq adalah default dan GRATIS!**
+
+### Provider yang Didukung
+
+| Provider | Transcription | Analysis | Biaya |
+|----------|--------------|----------|-------|
+| **Groq** (Default) | ✅ Whisper | ✅ Llama 3.3 | **GRATIS** |
+| OpenAI | ✅ Whisper | ✅ GPT-4 | Berbayar |
+| Gemini | ❌ | ✅ Gemini | Free tier |
+| Ollama | ❌ | ✅ Local LLM | **GRATIS** (offline) |
+| Local | ✅ faster-whisper | ❌ | **GRATIS** (offline) |
+
+### Step 1: Dapatkan Groq API Key (GRATIS - Recommended)
 
 1. Buka browser
-2. Pergi ke: https://aistudio.google.com/
-3. Login dengan akun Google kamu
-
-### Step 2: Buat API Key
-
-1. Klik **"Get API Key"** di sidebar kiri
-2. Klik **"Create API Key"**
-3. Pilih project (atau buat baru)
-4. Copy API key yang muncul
+2. Pergi ke: https://console.groq.com/
+3. Login dengan akun Google atau GitHub
+4. Klik **"API Keys"** di sidebar
+5. Klik **"Create API Key"**
+6. Copy API key yang muncul
 
 > ⚠️ **PENTING**: Simpan API key ini dengan aman! Jangan share ke siapapun.
 
-### Step 3: Setup API Key
+### Step 2 (Optional): Dapatkan API Key Lainnya
 
-Ada 3 cara untuk menyimpan API key:
+**Gemini API Key** (untuk analyzer alternatif):
+1. Buka https://aistudio.google.com/
+2. Login dengan akun Google
+3. Klik **"Get API Key"**
+4. Copy API key
+
+**OpenAI API Key** (berbayar):
+1. Buka https://platform.openai.com/api-keys
+2. Login dan buat API key
+
+### Step 3: Setup API Key
 
 **Cara 1: Environment Variable (Recommended)**
 
 **Windows (Command Prompt):**
 ```cmd
-set GEMINI_API_KEY=your-api-key-here
+set GROQ_API_KEY=your-groq-api-key-here
 ```
 
 **Windows (PowerShell):**
 ```powershell
-$env:GEMINI_API_KEY="your-api-key-here"
+$env:GROQ_API_KEY="your-groq-api-key-here"
 ```
 
 **macOS/Linux:**
 ```bash
-export GEMINI_API_KEY="your-api-key-here"
+export GROQ_API_KEY="your-groq-api-key-here"
 ```
 
 **Cara 2: Via CLI Flag**
-
-Kamu bisa langsung pass API key saat menjalankan command:
 ```cmd
-sclip -i video.mp4 --api-key "your-api-key-here"
+sclip -i video.mp4 --groq-api-key "your-api-key-here"
 ```
 
-**Cara 3: Config File**
-
-Buat folder dan file config:
-
-**Windows:**
-```cmd
-mkdir %USERPROFILE%\.sclip
-echo {"gemini_api_key": "your-api-key-here"} > %USERPROFILE%\.sclip\config.json
-```
-
-**macOS/Linux:**
-```bash
-mkdir -p ~/.sclip
-echo '{"gemini_api_key": "your-api-key-here"}' > ~/.sclip/config.json
-```
-
-**Cara 4: Setup Wizard**
-
-Jalankan setup wizard untuk konfigurasi interaktif:
+**Cara 3: Setup Wizard**
 ```cmd
 sclip --setup
 ```
@@ -468,21 +467,20 @@ sclip -i video.mp4 --min-duration 20 --max-duration 45
 sclip -i video.mp4 -f
 ```
 
-### Contoh 16: Menggunakan Bahasa Lain untuk Captions
+### Contoh 16: Menggunakan Provider Berbeda
 
 ```cmd
-# Default: Bahasa Indonesia (tanpa flag)
+# Default: Groq untuk transcription dan analysis (GRATIS)
 sclip -i video.mp4
 
-# Explicit Bahasa Indonesia
-sclip -i video.mp4 -l id
+# Gunakan Gemini untuk analysis
+sclip -i video.mp4 --analyzer gemini
 
-# English
-sclip -i video.mp4 -l en
+# Gunakan OpenAI untuk transcription
+sclip -i video.mp4 --transcriber openai
 
-# Bahasa lain
-sclip -i video.mp4 -l ja   # Japanese
-sclip -i video.mp4 -l ko   # Korean
+# Mode offline (tanpa internet)
+sclip -i video.mp4 --transcriber local --analyzer ollama
 ```
 
 ---
@@ -569,11 +567,64 @@ sclip -i vlog_indo.mp4 -l en
 **Q: Hasil transcription tidak akurat?**
 - Pastikan audio video jelas dan minim noise
 - Coba gunakan bahasa yang sama dengan audio video
-- Gemini AI tidak 100% akurat, terutama untuk bahasa dengan dialek regional
+- Whisper AI tidak 100% akurat, terutama untuk bahasa dengan dialek regional
 
 **Q: Bahasa tidak didukung?**
 - Coba gunakan kode bahasa ISO 639-1 yang benar
-- Beberapa bahasa mungkin memiliki dukungan terbatas di Gemini
+- Beberapa bahasa mungkin memiliki dukungan terbatas
+
+---
+
+## 8.2. Provider Options
+
+SmartClip AI mendukung berbagai provider untuk transcription dan analysis.
+
+### Transcription Providers
+
+| Provider | Command | Keterangan |
+|----------|---------|------------|
+| Groq (Default) | `--transcriber groq` | Gratis, cepat, limit 25MB |
+| OpenAI | `--transcriber openai` | Berbayar, akurat |
+| Local | `--transcriber local` | Offline, butuh faster-whisper |
+
+### Analysis Providers
+
+| Provider | Command | Keterangan |
+|----------|---------|------------|
+| Groq (Default) | `--analyzer groq` | Gratis, sangat cepat |
+| Gemini | `--analyzer gemini` | Free tier tersedia |
+| OpenAI | `--analyzer openai` | Berbayar, kualitas tinggi |
+| Ollama | `--analyzer ollama` | Offline, butuh Ollama |
+
+### Contoh Kombinasi
+
+```cmd
+# 100% Gratis (Default)
+sclip -i video.mp4
+
+# Gratis dengan Gemini analysis
+sclip -i video.mp4 --analyzer gemini
+
+# 100% Offline
+sclip -i video.mp4 --transcriber local --analyzer ollama
+
+# Premium (OpenAI untuk semua)
+sclip -i video.mp4 --transcriber openai --analyzer openai
+```
+
+### Setup Offline Mode
+
+Untuk mode offline, kamu perlu install:
+
+**1. faster-whisper (untuk local transcription):**
+```cmd
+pip install faster-whisper
+```
+
+**2. Ollama (untuk local analysis):**
+- Download dari https://ollama.ai
+- Jalankan: `ollama serve`
+- Pull model: `ollama pull llama3.2`
 
 ---
 
@@ -623,11 +674,12 @@ sclip -i video.mp4 --ffmpeg-path "C:\ffmpeg\bin\ffmpeg.exe"
 
 ### Error: "Rate limit exceeded"
 
-**Penyebab:** Terlalu banyak request ke Gemini API
+**Penyebab:** Terlalu banyak request ke API provider
 
 **Solusi:**
 1. Tunggu beberapa menit
-2. Gemini free tier punya limit per menit/hari
+2. Groq dan Gemini free tier punya limit per menit/hari
+3. Coba gunakan provider lain (misalnya `--analyzer gemini` jika Groq limit)
 
 ### Error: "Video too short"
 
@@ -639,11 +691,12 @@ sclip -i video.mp4 --ffmpeg-path "C:\ffmpeg\bin\ffmpeg.exe"
 
 ### Error: "Video too long"
 
-**Penyebab:** Video melebihi context window Gemini
+**Penyebab:** Video sangat panjang (> 2 jam)
 
 **Solusi:**
-- SmartClip akan otomatis chunking video panjang (> 30 menit)
-- Jika masih error, coba video yang lebih pendek dulu
+- Arsitektur baru mendukung video panjang tanpa batasan chunking
+- Untuk video sangat panjang, proses transcription mungkin memakan waktu beberapa menit
+- Jika menggunakan Groq/OpenAI Whisper, pastikan audio < 25MB (sekitar 1-2 jam video)
 
 ### Virtual Environment Tidak Aktif
 
@@ -694,7 +747,8 @@ Pilih salah satu saja, jangan keduanya.
 | **Burn-in Captions** | Subtitle yang "ditanam" permanen ke video |
 | **Aspect Ratio** | Perbandingan lebar:tinggi video (9:16, 1:1, 16:9) |
 | **Dry Run** | Menjalankan preview tanpa benar-benar memproses |
-| **Chunking** | Memecah video panjang jadi bagian-bagian kecil |
+| **Transcriber** | Provider untuk speech-to-text (Groq, OpenAI, Local) |
+| **Analyzer** | Provider untuk analisis viral moments (Groq, Gemini, OpenAI, Ollama) |
 | **H.264** | Codec video standar untuk kompatibilitas tinggi |
 | **AAC** | Codec audio standar untuk kompatibilitas tinggi |
 | **ASS** | Format subtitle dengan styling (Advanced SubStation Alpha) |
@@ -757,8 +811,14 @@ sclip [options]
 | `--no-captions` | - | `false` | Skip captions |
 | `--no-metadata` | - | `false` | Skip metadata |
 | `--keep-temp` | - | `false` | Keep temp files |
-| `--api-key` | - | env var | Gemini API key |
-| `--model` | - | `gemini-2.0-flash` | Gemini model to use |
+| `--transcriber` | - | `groq` | Provider transcription |
+| `--analyzer` | - | `groq` | Provider analysis |
+| `--groq-api-key` | - | env var | Groq API key |
+| `--gemini-api-key` | - | env var | Gemini API key |
+| `--openai-api-key` | - | env var | OpenAI API key |
+| `--transcriber-model` | - | auto | Model transcription |
+| `--analyzer-model` | - | auto | Model analysis |
+| `--ollama-host` | - | `localhost:11434` | Ollama server |
 | `--ffmpeg-path` | - | auto | Custom FFmpeg path |
 | `--info` | - | `false` | Show video info |
 | `--check-deps` | - | `false` | Check dependencies |
@@ -774,18 +834,20 @@ sclip [options]
 
 A: Waktu pemrosesan tergantung pada beberapa faktor:
 - Durasi video asli
-- Kecepatan internet (untuk upload ke Gemini API)
+- Provider yang digunakan (Groq paling cepat)
+- Kecepatan internet (untuk API calls)
 - Spesifikasi hardware komputer
-- Jumlah clips yang di-generate
 
-Sebagai patokan, video 30 menit biasanya membutuhkan 5-15 menit untuk diproses sepenuhnya.
+Sebagai patokan, video 30 menit biasanya membutuhkan 3-10 menit untuk diproses sepenuhnya dengan Groq.
 
 **Q: Apakah SmartClip gratis?**
 
-A: SmartClip sendiri gratis dan open-source. Namun, kamu membutuhkan:
-- Google Gemini API key (ada free tier dengan batasan)
-- FFmpeg (gratis dan open-source)
-- yt-dlp (gratis dan open-source, optional untuk YouTube)
+A: SmartClip sendiri gratis dan open-source. Untuk provider:
+- **Groq (Default)**: 100% GRATIS dengan rate limit
+- **Gemini**: Free tier tersedia
+- **OpenAI**: Berbayar
+- **Ollama + Local Whisper**: Gratis, offline, butuh hardware yang cukup
+- FFmpeg dan yt-dlp: Gratis dan open-source
 
 **Q: Format video apa saja yang didukung?**
 
@@ -805,18 +867,29 @@ Output selalu dalam format `.mp4` (H.264 + AAC) untuk kompatibilitas maksimal.
 
 A: 
 - Minimum: 60 detik (video lebih pendek akan ditolak)
-- Maksimum: Tidak ada batasan keras, tapi video > 30 menit akan di-chunk otomatis
+- Maksimum: Tidak ada batasan keras
+- Video panjang (> 2 jam) akan memakan waktu lebih lama untuk transcription
+- Jika menggunakan Groq/OpenAI Whisper API, audio harus < 25MB
 
 ---
 
-### API & Gemini
+### API & Provider
+
+**Q: Provider mana yang sebaiknya saya gunakan?**
+
+A:
+- **Groq (Default)**: GRATIS, cepat, recommended untuk kebanyakan pengguna
+- **OpenAI**: Berbayar, kualitas tinggi
+- **Gemini**: Free tier tersedia, context window besar
+- **Ollama**: Offline, butuh GPU untuk performa optimal
+- **Local Whisper**: Offline transcription, lebih lambat di CPU
 
 **Q: Apa itu rate limit dan bagaimana mengatasinya?**
 
-A: Rate limit adalah batasan jumlah request ke Gemini API dalam periode waktu tertentu. Jika kamu mendapat error "Rate limit exceeded":
+A: Rate limit adalah batasan jumlah request ke API dalam periode waktu tertentu. Jika kamu mendapat error "Rate limit exceeded":
 1. Tunggu beberapa menit sebelum mencoba lagi
-2. Gemini free tier memiliki batasan per menit dan per hari
-3. Untuk penggunaan intensif, pertimbangkan upgrade ke paid tier
+2. Groq dan Gemini free tier memiliki batasan per menit dan per hari
+3. Untuk penggunaan intensif, pertimbangkan upgrade ke paid tier atau gunakan provider berbeda
 
 **Q: API key saya tidak berfungsi, apa yang harus dilakukan?**
 
@@ -834,12 +907,16 @@ A: AI tidak sempurna. Beberapa tips untuk hasil lebih baik:
 - Hindari video dengan banyak background noise
 - Coba jalankan ulang - hasil bisa berbeda setiap kali
 
-**Q: Apakah video saya aman? Apakah Google menyimpan video saya?**
+**Q: Apakah video saya aman? Apakah data saya di-upload?**
 
-A: Video di-upload ke Gemini API untuk analisis. Menurut kebijakan Google:
-- Video diproses untuk menghasilkan analisis
-- Sebaiknya baca [Google AI Terms of Service](https://ai.google.dev/terms) untuk detail lengkap
-- Jangan upload video yang mengandung informasi sensitif atau rahasia
+A: Tergantung provider yang digunakan:
+- **Groq/OpenAI/Gemini**: Audio dikirim ke API untuk transcription/analysis
+- **Local Whisper + Ollama**: 100% offline, tidak ada data yang dikirim
+
+Tips keamanan:
+- Untuk video sensitif, gunakan mode offline (`--transcriber local --analyzer ollama`)
+- Baca Terms of Service masing-masing provider
+- Jangan upload video yang mengandung informasi rahasia ke cloud API
 
 ---
 

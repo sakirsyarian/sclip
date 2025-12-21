@@ -52,14 +52,14 @@ from typing import Optional
 
 import click
 
-from src.types import CLIOptions, ExitCode, AspectRatio, CaptionStyle
+from src.types import CLIOptions, ExitCode, AspectRatio, CaptionStyle, TranscriberProvider, AnalyzerProvider
 from src.utils.cleanup import setup_cleanup_context, setup_signal_handlers
-from src.utils.config import get_api_key, get_ffmpeg_path, load_config
+from src.utils.config import get_api_key, get_ffmpeg_path, get_groq_api_key, get_openai_api_key, get_gemini_api_key, load_config
 from src.utils.logger import setup_logger, get_logger
 
 
 # Version info - follows semantic versioning
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 __app_name__ = "SmartClip AI"
 
 
@@ -205,10 +205,58 @@ def version_callback(ctx: click.Context, param: click.Parameter, value: bool) ->
     help="Custom path to FFmpeg executable",
 )
 @click.option(
-    "--audio-only",
-    is_flag=True,
-    default=False,
-    help="Extract audio and send to Gemini instead of video (faster upload for large files)",
+    "--transcriber",
+    type=click.Choice(["groq", "openai", "local"]),
+    default="groq",
+    show_default=True,
+    help="Transcription provider (groq=free Whisper API, openai=OpenAI Whisper, local=faster-whisper)",
+)
+@click.option(
+    "--analyzer",
+    type=click.Choice(["groq", "gemini", "openai", "ollama"]),
+    default="groq",
+    show_default=True,
+    help="Analysis provider for viral moment detection",
+)
+@click.option(
+    "--groq-api-key",
+    type=str,
+    default=None,
+    envvar="GROQ_API_KEY",
+    help="Groq API key (or set GROQ_API_KEY env var)",
+)
+@click.option(
+    "--openai-api-key",
+    type=str,
+    default=None,
+    envvar="OPENAI_API_KEY",
+    help="OpenAI API key (or set OPENAI_API_KEY env var)",
+)
+@click.option(
+    "--gemini-api-key",
+    type=str,
+    default=None,
+    envvar="GEMINI_API_KEY",
+    help="Gemini API key (or set GEMINI_API_KEY env var)",
+)
+@click.option(
+    "--transcriber-model",
+    type=str,
+    default=None,
+    help="Model for transcription (default: whisper-large-v3-turbo for Groq)",
+)
+@click.option(
+    "--analyzer-model",
+    type=str,
+    default=None,
+    help="Model for analysis (default: llama-3.3-70b-versatile for Groq)",
+)
+@click.option(
+    "--ollama-host",
+    type=str,
+    default="http://localhost:11434",
+    show_default=True,
+    help="Ollama server host URL",
 )
 @click.option(
     "--info",
@@ -258,7 +306,14 @@ def main(
     api_key: Optional[str],
     model: str,
     ffmpeg_path: Optional[str],
-    audio_only: bool,
+    transcriber: str,
+    analyzer: str,
+    groq_api_key: Optional[str],
+    openai_api_key: Optional[str],
+    gemini_api_key: Optional[str],
+    transcriber_model: Optional[str],
+    analyzer_model: Optional[str],
+    ollama_host: str,
     show_info: bool,
     check_deps: bool,
     run_setup: bool,
@@ -267,13 +322,25 @@ def main(
     
     \b
     Examples:
-      sclip -i podcast.mp4                    # Process local video
+      sclip -i podcast.mp4                    # Process local video (default: Groq)
       sclip -u "https://youtu.be/xxxxx"       # Process YouTube video
       sclip -i video.mp4 --dry-run            # Preview without rendering
       sclip -i video.mp4 -n 3 -a 1:1          # 3 clips, square format
-      sclip -i video.mp4 --info               # Show video info only
+      sclip -i video.mp4 --analyzer gemini    # Use Gemini for analysis
+      sclip -i video.mp4 --transcriber local --analyzer ollama  # Fully offline
       sclip --check-deps                      # Check dependencies
       sclip --setup                           # Run setup wizard
+    
+    \b
+    Provider Options:
+      --transcriber groq     Groq Whisper API (free, fast)
+      --transcriber openai   OpenAI Whisper API
+      --transcriber local    Local faster-whisper (offline)
+      
+      --analyzer groq        Groq LLMs (free, fast)
+      --analyzer gemini      Google Gemini
+      --analyzer openai      OpenAI GPT-4
+      --analyzer ollama      Local Ollama (offline)
     
     \b
     For more information, visit: https://github.com/sarian/sclip
@@ -301,6 +368,11 @@ def main(
             sys.exit(exit_code)
         
         # Build CLI options
+        # Resolve API keys: CLI > env var > config
+        resolved_groq_key = get_groq_api_key(groq_api_key)
+        resolved_openai_key = get_openai_api_key(openai_api_key)
+        resolved_gemini_key = get_gemini_api_key(gemini_api_key or api_key)
+        
         options = CLIOptions(
             url=url,
             input=input_file,
@@ -318,10 +390,19 @@ def main(
             no_captions=no_captions,
             no_metadata=no_metadata,
             keep_temp=keep_temp,
-            api_key=get_api_key(api_key),
-            model=model,
             ffmpeg_path=get_ffmpeg_path(ffmpeg_path),
-            audio_only=audio_only,
+            # New provider options
+            transcriber=transcriber,  # type: ignore
+            analyzer=analyzer,  # type: ignore
+            groq_api_key=resolved_groq_key,
+            openai_api_key=resolved_openai_key,
+            gemini_api_key=resolved_gemini_key,
+            transcriber_model=transcriber_model,
+            analyzer_model=analyzer_model,
+            ollama_host=ollama_host,
+            # Legacy (for backward compatibility)
+            api_key=resolved_gemini_key,
+            model=model,
         )
         
         # Route to clip command
@@ -348,7 +429,7 @@ def handle_check_deps(
     
     Args:
         ffmpeg_path: Custom FFmpeg path
-        api_key: API key from CLI
+        api_key: API key from CLI (legacy)
         verbose: Whether to show verbose output
         
     Returns:
@@ -356,6 +437,7 @@ def handle_check_deps(
     """
     from src.utils.ffmpeg import check_dependencies
     import shutil
+    import os
     
     logger = get_logger()
     
@@ -394,20 +476,66 @@ def handle_check_deps(
     else:
         logger.warning("yt-dlp: not found (required for YouTube downloads)")
     
-    # Check Gemini API key
-    resolved_key = get_api_key(api_key)
-    if resolved_key:
-        # Mask the key for display
-        masked = resolved_key[:4] + "..." + resolved_key[-4:] if len(resolved_key) > 8 else "***"
-        logger.success(f"Gemini API key: configured ({masked})")
+    logger.newline()
+    logger.info("API Keys:")
+    
+    # Check Groq API key (default - FREE)
+    groq_key = get_groq_api_key()
+    if groq_key:
+        masked = groq_key[:4] + "..." + groq_key[-4:] if len(groq_key) > 8 else "***"
+        logger.success(f"  GROQ_API_KEY: configured ({masked}) [DEFAULT - FREE]")
     else:
-        logger.warning("Gemini API key: not configured")
-        logger.info("  Set via: --api-key, GEMINI_API_KEY env var, or run --setup")
+        logger.warning("  GROQ_API_KEY: not configured (get free key at console.groq.com)")
+    
+    # Check OpenAI API key
+    openai_key = get_openai_api_key()
+    if openai_key:
+        masked = openai_key[:4] + "..." + openai_key[-4:] if len(openai_key) > 8 else "***"
+        logger.success(f"  OPENAI_API_KEY: configured ({masked})")
+    else:
+        logger.warning("  OPENAI_API_KEY: not configured (optional - paid)")
+    
+    # Check Gemini API key
+    gemini_key = get_gemini_api_key(api_key)
+    if gemini_key:
+        masked = gemini_key[:4] + "..." + gemini_key[-4:] if len(gemini_key) > 8 else "***"
+        logger.success(f"  GEMINI_API_KEY: configured ({masked})")
+    else:
+        logger.warning("  GEMINI_API_KEY: not configured (optional - free tier)")
+    
+    logger.newline()
+    logger.info("Local Providers:")
+    
+    # Check faster-whisper (for local transcription)
+    try:
+        import faster_whisper
+        logger.success("  faster-whisper: installed")
+    except ImportError:
+        logger.warning("  faster-whisper: not installed (pip install faster-whisper)")
+    
+    # Check Ollama
+    try:
+        import httpx
+        try:
+            response = httpx.get("http://localhost:11434/api/tags", timeout=2.0)
+            if response.status_code == 200:
+                models = response.json().get("models", [])
+                logger.success(f"  Ollama: running ({len(models)} models available)")
+            else:
+                logger.warning("  Ollama: not responding")
+        except Exception:
+            logger.warning("  Ollama: not running (start with 'ollama serve')")
+    except ImportError:
+        logger.warning("  Ollama check: httpx not installed")
     
     logger.newline()
     
     if all_ok:
         logger.success("All required dependencies are available!")
+        logger.info("\nDefault setup (100% free):")
+        logger.info("  --transcriber groq --analyzer groq")
+        logger.info("\nOffline setup:")
+        logger.info("  --transcriber local --analyzer ollama")
         return ExitCode.SUCCESS
     else:
         logger.error("Some required dependencies are missing. Run 'sclip --setup' for help.")

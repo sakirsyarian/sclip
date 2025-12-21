@@ -4,8 +4,8 @@ Handles loading, saving, and managing configuration from ~/.sclip/config.json.
 Supports cross-platform paths and environment variable overrides.
 
 Configuration Priority (highest to lowest):
-    1. CLI arguments (--api-key, --ffmpeg-path)
-    2. Environment variables (GEMINI_API_KEY, FFMPEG_PATH)
+    1. CLI arguments (--groq-api-key, --openai-api-key, etc.)
+    2. Environment variables (GROQ_API_KEY, OPENAI_API_KEY, etc.)
     3. Config file (~/.sclip/config.json)
     4. Default values
 
@@ -15,16 +15,16 @@ Security:
     - Config directory permissions are set to 700 (owner only) on Unix
 
 Usage:
-    from src.utils.config import load_config, save_config, get_api_key
+    from src.utils.config import load_config, save_config, get_groq_api_key
     
     # Load configuration
     config = load_config()
     
     # Get API key with priority resolution
-    api_key = get_api_key(cli_key=args.api_key)
+    api_key = get_groq_api_key(cli_key=args.groq_api_key)
     
     # Save updated configuration
-    config.gemini_api_key = "new_key"
+    config.groq_api_key = "new_key"
     save_config(config)
 """
 
@@ -34,7 +34,7 @@ import stat
 from pathlib import Path
 from typing import Any
 
-from src.types import Config, AspectRatio, CaptionStyle
+from src.types import Config, AspectRatio, CaptionStyle, TranscriberProvider, AnalyzerProvider
 
 
 # Config file name and directory constants
@@ -42,8 +42,14 @@ CONFIG_FILENAME = "config.json"
 CONFIG_DIR_NAME = ".sclip"  # Hidden directory in user's home
 
 # Environment variable names for configuration overrides
-ENV_API_KEY = "GEMINI_API_KEY"      # Gemini API key
-ENV_FFMPEG_PATH = "FFMPEG_PATH"     # Custom FFmpeg path
+ENV_GROQ_API_KEY = "GROQ_API_KEY"
+ENV_OPENAI_API_KEY = "OPENAI_API_KEY"
+ENV_GEMINI_API_KEY = "GEMINI_API_KEY"
+ENV_OLLAMA_HOST = "OLLAMA_HOST"
+ENV_FFMPEG_PATH = "FFMPEG_PATH"
+
+# Legacy environment variable (deprecated)
+ENV_API_KEY = "GEMINI_API_KEY"  # Kept for backward compatibility
 
 
 def get_config_dir() -> Path:
@@ -85,12 +91,24 @@ def _config_to_dict(config: Config) -> dict[str, Any]:
         Dictionary representation of the config
     """
     return {
+        # API Keys
+        "groq_api_key": config.groq_api_key,
+        "openai_api_key": config.openai_api_key,
         "gemini_api_key": config.gemini_api_key,
-        "default_model": config.default_model,
+        # Provider defaults
+        "default_transcriber": config.default_transcriber,
+        "default_analyzer": config.default_analyzer,
+        "default_transcriber_model": config.default_transcriber_model,
+        "default_analyzer_model": config.default_analyzer_model,
+        "ollama_host": config.ollama_host,
+        # FFmpeg
         "ffmpeg_path": config.ffmpeg_path,
+        # Output defaults
         "default_output_dir": config.default_output_dir,
         "default_aspect_ratio": config.default_aspect_ratio,
         "default_caption_style": config.default_caption_style,
+        "default_language": config.default_language,
+        # Clip settings
         "max_clips": config.max_clips,
         "min_duration": config.min_duration,
         "max_duration": config.max_duration,
@@ -111,9 +129,23 @@ def _dict_to_config(data: dict[str, Any]) -> Config:
     defaults = Config()
     
     return Config(
+        # API Keys
+        groq_api_key=data.get("groq_api_key", defaults.groq_api_key),
+        openai_api_key=data.get("openai_api_key", defaults.openai_api_key),
         gemini_api_key=data.get("gemini_api_key", defaults.gemini_api_key),
-        default_model=data.get("default_model", defaults.default_model),
+        # Provider defaults
+        default_transcriber=_validate_transcriber(
+            data.get("default_transcriber", defaults.default_transcriber)
+        ),
+        default_analyzer=_validate_analyzer(
+            data.get("default_analyzer", defaults.default_analyzer)
+        ),
+        default_transcriber_model=data.get("default_transcriber_model", defaults.default_transcriber_model),
+        default_analyzer_model=data.get("default_analyzer_model", defaults.default_analyzer_model),
+        ollama_host=data.get("ollama_host", defaults.ollama_host),
+        # FFmpeg
         ffmpeg_path=data.get("ffmpeg_path", defaults.ffmpeg_path),
+        # Output defaults
         default_output_dir=data.get("default_output_dir", defaults.default_output_dir),
         default_aspect_ratio=_validate_aspect_ratio(
             data.get("default_aspect_ratio", defaults.default_aspect_ratio)
@@ -121,6 +153,8 @@ def _dict_to_config(data: dict[str, Any]) -> Config:
         default_caption_style=_validate_caption_style(
             data.get("default_caption_style", defaults.default_caption_style)
         ),
+        default_language=data.get("default_language", defaults.default_language),
+        # Clip settings
         max_clips=data.get("max_clips", defaults.max_clips),
         min_duration=data.get("min_duration", defaults.min_duration),
         max_duration=data.get("max_duration", defaults.max_duration),
@@ -128,14 +162,7 @@ def _dict_to_config(data: dict[str, Any]) -> Config:
 
 
 def _validate_aspect_ratio(value: str) -> AspectRatio:
-    """Validate and return aspect ratio value.
-    
-    Args:
-        value: Aspect ratio string to validate
-        
-    Returns:
-        Valid AspectRatio value, defaults to "9:16" if invalid
-    """
+    """Validate and return aspect ratio value."""
     valid_ratios: list[AspectRatio] = ["9:16", "1:1", "16:9"]
     if value in valid_ratios:
         return value  # type: ignore
@@ -143,18 +170,27 @@ def _validate_aspect_ratio(value: str) -> AspectRatio:
 
 
 def _validate_caption_style(value: str) -> CaptionStyle:
-    """Validate and return caption style value.
-    
-    Args:
-        value: Caption style string to validate
-        
-    Returns:
-        Valid CaptionStyle value, defaults to "default" if invalid
-    """
+    """Validate and return caption style value."""
     valid_styles: list[CaptionStyle] = ["default", "bold", "minimal", "karaoke"]
     if value in valid_styles:
         return value  # type: ignore
     return "default"
+
+
+def _validate_transcriber(value: str) -> TranscriberProvider:
+    """Validate and return transcriber provider value."""
+    valid_providers: list[TranscriberProvider] = ["groq", "openai", "local"]
+    if value in valid_providers:
+        return value  # type: ignore
+    return "groq"
+
+
+def _validate_analyzer(value: str) -> AnalyzerProvider:
+    """Validate and return analyzer provider value."""
+    valid_providers: list[AnalyzerProvider] = ["groq", "gemini", "openai", "ollama"]
+    if value in valid_providers:
+        return value  # type: ignore
+    return "groq"
 
 
 def load_config() -> Config:
@@ -207,56 +243,71 @@ def save_config(config: Config) -> None:
         json.dump(data, f, indent=2)
     
     # Set restrictive file permissions on Unix systems
-    # This protects the API key from being read by other users
-    # Windows handles file permissions differently (ACLs)
     if os.name != "nt":  # Not Windows
         config_path.chmod(stat.S_IRUSR | stat.S_IWUSR)  # 600 = rw-------
 
 
-def get_api_key(cli_key: str | None = None) -> str | None:
-    """Get API key with priority: CLI > environment > config.
-    
-    Args:
-        cli_key: API key provided via CLI argument (highest priority)
-        
-    Returns:
-        API key string or None if not found anywhere
-    """
-    # Priority 1: CLI argument
+# API Key getters with priority: CLI > environment > config
+
+def get_groq_api_key(cli_key: str | None = None) -> str | None:
+    """Get Groq API key with priority: CLI > environment > config."""
     if cli_key:
         return cli_key
-    
-    # Priority 2: Environment variable
-    env_key = os.environ.get(ENV_API_KEY)
+    env_key = os.environ.get(ENV_GROQ_API_KEY)
     if env_key:
         return env_key
-    
-    # Priority 3: Config file
+    config = load_config()
+    return config.groq_api_key
+
+
+def get_openai_api_key(cli_key: str | None = None) -> str | None:
+    """Get OpenAI API key with priority: CLI > environment > config."""
+    if cli_key:
+        return cli_key
+    env_key = os.environ.get(ENV_OPENAI_API_KEY)
+    if env_key:
+        return env_key
+    config = load_config()
+    return config.openai_api_key
+
+
+def get_gemini_api_key(cli_key: str | None = None) -> str | None:
+    """Get Gemini API key with priority: CLI > environment > config."""
+    if cli_key:
+        return cli_key
+    env_key = os.environ.get(ENV_GEMINI_API_KEY)
+    if env_key:
+        return env_key
     config = load_config()
     return config.gemini_api_key
 
 
+def get_ollama_host(cli_host: str | None = None) -> str:
+    """Get Ollama host with priority: CLI > environment > config."""
+    if cli_host:
+        return cli_host
+    env_host = os.environ.get(ENV_OLLAMA_HOST)
+    if env_host:
+        return env_host
+    config = load_config()
+    return config.ollama_host
+
+
 def get_ffmpeg_path(cli_path: str | None = None) -> str | None:
-    """Get FFmpeg path with priority: CLI > environment > config.
-    
-    Args:
-        cli_path: FFmpeg path provided via CLI argument (highest priority)
-        
-    Returns:
-        FFmpeg path string or None if not specified
-    """
-    # Priority 1: CLI argument
+    """Get FFmpeg path with priority: CLI > environment > config."""
     if cli_path:
         return cli_path
-    
-    # Priority 2: Environment variable
     env_path = os.environ.get(ENV_FFMPEG_PATH)
     if env_path:
         return env_path
-    
-    # Priority 3: Config file
     config = load_config()
     return config.ffmpeg_path
+
+
+# Legacy function for backward compatibility
+def get_api_key(cli_key: str | None = None) -> str | None:
+    """Get API key (legacy - returns Gemini API key for backward compatibility)."""
+    return get_gemini_api_key(cli_key)
 
 
 __all__ = [
@@ -264,10 +315,18 @@ __all__ = [
     "get_config_path",
     "load_config",
     "save_config",
-    "get_api_key",
+    "get_groq_api_key",
+    "get_openai_api_key",
+    "get_gemini_api_key",
+    "get_ollama_host",
     "get_ffmpeg_path",
+    "get_api_key",  # Legacy
     "CONFIG_FILENAME",
     "CONFIG_DIR_NAME",
-    "ENV_API_KEY",
+    "ENV_GROQ_API_KEY",
+    "ENV_OPENAI_API_KEY",
+    "ENV_GEMINI_API_KEY",
+    "ENV_OLLAMA_HOST",
     "ENV_FFMPEG_PATH",
+    "ENV_API_KEY",  # Legacy
 ]

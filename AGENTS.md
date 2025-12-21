@@ -4,19 +4,20 @@ This document provides context for AI assistants working with the SmartClip AI c
 
 ## Project Overview
 
-SmartClip AI (`sclip`) is a Python CLI tool that transforms long-form videos (podcasts, interviews, webinars) into viral-ready short clips using Google Gemini AI. It automatically identifies engaging moments, generates word-level captions, and renders clips with customizable aspect ratios and caption styles.
+SmartClip AI (`sclip`) is a Python CLI tool that transforms long-form videos (podcasts, interviews, webinars) into viral-ready short clips using AI. It supports multiple AI providers for transcription and analysis, with Groq as the default (free) option.
 
 ## Tech Stack
 
 - **Language**: Python 3.10+
 - **CLI Framework**: Click
-- **AI Service**: Google Gemini API (`google-genai` SDK)
+- **Transcription**: Groq Whisper (default), OpenAI Whisper, Local faster-whisper
+- **Analysis**: Groq LLMs (default), Gemini, OpenAI GPT, Ollama
 - **Video Processing**: FFmpeg (external dependency)
 - **YouTube Downloads**: yt-dlp
 - **Console Output**: Rich library
 - **Package Management**: pip / pyproject.toml
 
-## Architecture
+## Architecture (v2)
 
 ```
 src/
@@ -25,9 +26,22 @@ src/
 │   ├── clip.py          # Main workflow orchestration
 │   └── setup.py         # Setup wizard
 ├── services/            # Core business logic
+│   ├── audio.py         # Audio extraction from video
 │   ├── downloader.py    # YouTube download (yt-dlp wrapper)
-│   ├── gemini.py        # Gemini AI client for video analysis
-│   └── renderer.py      # FFmpeg video rendering
+│   ├── renderer.py      # FFmpeg video rendering
+│   ├── transcribers/    # Transcription providers
+│   │   ├── __init__.py  # Factory function get_transcriber()
+│   │   ├── base.py      # BaseTranscriber abstract class
+│   │   ├── groq.py      # Groq Whisper API
+│   │   ├── openai.py    # OpenAI Whisper API
+│   │   └── local.py     # Local faster-whisper
+│   └── analyzers/       # Analysis providers
+│       ├── __init__.py  # Factory function get_analyzer()
+│       ├── base.py      # BaseAnalyzer abstract class
+│       ├── groq.py      # Groq LLMs (Llama 3.3, etc.)
+│       ├── gemini.py    # Google Gemini
+│       ├── openai.py    # OpenAI GPT-4
+│       └── ollama.py    # Local Ollama
 ├── utils/               # Utility modules
 │   ├── captions.py      # ASS subtitle generation
 │   ├── cleanup.py       # Temp file management
@@ -40,7 +54,7 @@ src/
     └── __init__.py      # Dataclasses, TypedDicts, Enums
 ```
 
-## Key Data Flow
+## Key Data Flow (v2)
 
 ```
 User Input (URL/File)
@@ -51,9 +65,11 @@ Download (if YouTube URL) → yt-dlp
     ↓
 Video Analysis → ffprobe (duration, resolution, codec)
     ↓
-Chunking → Split if > 30 min (Gemini context limit)
+Audio Extraction → FFmpeg (mp3, 16kHz, mono)
     ↓
-Gemini API Call → Transcription + Viral Moment Detection
+Transcription → Whisper (Groq/OpenAI/Local)
+    ↓
+Analysis → LLM (Groq/Gemini/OpenAI/Ollama)
     ↓
 JSON Parsing → Extract clips data
     ↓
@@ -87,31 +103,78 @@ class ExitCode(IntEnum):
 # Type aliases
 AspectRatio = Literal["9:16", "1:1", "16:9"]
 CaptionStyle = Literal["default", "bold", "minimal", "karaoke"]
+TranscriberProvider = Literal["groq", "openai", "local"]
+AnalyzerProvider = Literal["groq", "gemini", "openai", "ollama"]
 
 # Main dataclasses
 @dataclass
-class CLIOptions: ...      # All CLI arguments
-@dataclass
-class VideoInfo: ...       # Video metadata from ffprobe
-@dataclass
-class ValidationResult: ...# Validation results
-@dataclass
-class Config: ...          # App configuration
+class CLIOptions:
+    # Input/Output
+    url: str | None
+    input: str | None
+    output: str
+    # Clip settings
+    max_clips: int
+    min_duration: int
+    max_duration: int
+    aspect_ratio: AspectRatio
+    caption_style: CaptionStyle
+    language: str
+    # Provider options
+    transcriber: TranscriberProvider  # default: "groq"
+    analyzer: AnalyzerProvider        # default: "groq"
+    groq_api_key: str | None
+    openai_api_key: str | None
+    gemini_api_key: str | None
+    transcriber_model: str | None
+    analyzer_model: str | None
+    ollama_host: str
+    ...
 
-# TypedDicts for Gemini response
+# TypedDicts
 class CaptionSegment(TypedDict): ...  # {start, end, text}
 class ClipData(TypedDict): ...        # {start_time, end_time, title, description, captions}
-class GeminiResponse(TypedDict): ...  # {clips: list[ClipData]}
 ```
+
 
 ## Key Services
 
-### GeminiClient (src/services/gemini.py)
-- Uploads video to Gemini API
-- Analyzes for "viral moments" with engagement potential
-- Returns JSON with timestamps, titles, descriptions, word-level captions
-- Supports chunked analysis for videos > 30 minutes
-- Implements retry logic with exponential backoff
+### Transcribers (src/services/transcribers/)
+
+Factory: `get_transcriber(provider, api_key, model) -> BaseTranscriber`
+
+| Provider | Class | Default Model | Features |
+|----------|-------|---------------|----------|
+| groq | GroqTranscriber | whisper-large-v3-turbo | Free, fast, 25MB limit |
+| openai | OpenAITranscriber | whisper-1 | Paid, 25MB limit |
+| local | LocalTranscriber | base | Offline, no limit |
+
+```python
+from src.services.transcribers import get_transcriber
+
+transcriber = get_transcriber("groq", api_key="...")
+result = await transcriber.transcribe("audio.mp3", language="id")
+# result.text, result.words (with timestamps), result.duration
+```
+
+### Analyzers (src/services/analyzers/)
+
+Factory: `get_analyzer(provider, api_key, model, **kwargs) -> BaseAnalyzer`
+
+| Provider | Class | Default Model | Features |
+|----------|-------|---------------|----------|
+| groq | GroqAnalyzer | llama-3.3-70b-versatile | Free, very fast |
+| gemini | GeminiAnalyzer | gemini-2.0-flash | Free tier, large context |
+| openai | OpenAIAnalyzer | gpt-4o-mini | Paid, high quality |
+| ollama | OllamaAnalyzer | llama3.2 | Offline, local |
+
+```python
+from src.services.analyzers import get_analyzer
+
+analyzer = get_analyzer("groq", api_key="...")
+result = await analyzer.analyze(transcription, video_duration, max_clips=5)
+# result.clips: list[ClipData]
+```
 
 ### VideoRenderer (src/services/renderer.py)
 - Trims video to clip timestamps
@@ -129,10 +192,15 @@ class GeminiResponse(TypedDict): ...  # {clips: list[ClipData]}
 ## CLI Commands
 
 ```bash
-# Main workflow
+# Main workflow (default: Groq for both - FREE)
 sclip -i video.mp4              # Process local file
 sclip -u "youtube.com/..."      # Process YouTube URL
 sclip -i video.mp4 --dry-run    # Preview without rendering
+
+# Provider options
+sclip -i video.mp4 --transcriber groq --analyzer groq    # Default (free)
+sclip -i video.mp4 --transcriber local --analyzer ollama # Offline
+sclip -i video.mp4 --analyzer gemini                     # Use Gemini
 
 # Utility commands
 sclip --check-deps              # Check dependencies
@@ -153,26 +221,30 @@ sclip -i video.mp4 --info       # Show video info only
 
 Config file: `~/.sclip/config.json`
 
-API key priority: CLI flag → `GEMINI_API_KEY` env var → config file
+API key priority: CLI flag → Environment variable → Config file
 
-## Testing
-
-Tests are in `tests/` directory. Run with:
-```bash
-pytest                    # All tests
-pytest --cov=src          # With coverage
-pytest tests/test_*.py    # Specific file
-```
+Environment variables:
+- `GROQ_API_KEY` - Groq API key (transcription + analysis)
+- `GEMINI_API_KEY` - Google Gemini API key
+- `OPENAI_API_KEY` - OpenAI API key
+- `OLLAMA_HOST` - Ollama server URL (default: http://localhost:11434)
 
 ## Common Development Tasks
 
-### Adding a new CLI option
-1. Add to `@click.option()` decorators in `src/main.py`
-2. Add to `CLIOptions` dataclass in `src/types/__init__.py`
-3. Handle in appropriate command handler
+### Adding a new transcription provider
+1. Create `src/services/transcribers/newprovider.py`
+2. Extend `BaseTranscriber` class
+3. Implement `transcribe()`, `is_available()`, `name`, `default_model`
+4. Register in `src/services/transcribers/__init__.py`
 
-### Modifying Gemini prompt
-Edit `ANALYSIS_PROMPT` in `src/services/gemini.py`
+### Adding a new analysis provider
+1. Create `src/services/analyzers/newprovider.py`
+2. Extend `BaseAnalyzer` class
+3. Implement `analyze()`, `is_available()`, `name`, `default_model`
+4. Register in `src/services/analyzers/__init__.py`
+
+### Modifying analysis prompt
+Edit `ANALYSIS_PROMPT` in `src/services/analyzers/base.py`
 
 ### Adding a caption style
 Add to `CAPTION_STYLES` dict in `src/utils/captions.py`
@@ -183,7 +255,8 @@ Modify FFmpeg args in `VideoRenderer.render_clip()` in `src/services/renderer.py
 ## Error Handling Patterns
 
 - All validation returns `ValidationResult` with `valid`, `error`, `error_code`
-- Services raise specific exceptions (e.g., `GeminiAPIError`, `RenderError`)
+- Transcribers raise `TranscriptionError`, `TranscriptionAPIError`, `TranscriptionFileError`
+- Analyzers raise `AnalysisError`, `AnalysisAPIError`, `AnalysisParseError`
 - Cleanup context ensures temp files are removed on any exit
 - Signal handlers (SIGINT/SIGTERM) trigger graceful cleanup
 
@@ -192,10 +265,14 @@ Modify FFmpeg args in `VideoRenderer.render_clip()` in `src/services/renderer.py
 Required:
 - Python 3.10+
 - FFmpeg 5.0+ (external)
-- click, rich, google-genai
+- click, rich, groq
 
 Optional:
 - yt-dlp (for YouTube support)
+- google-genai (for Gemini analyzer)
+- openai (for OpenAI transcriber/analyzer)
+- faster-whisper (for local transcription)
+- httpx (for Ollama analyzer)
 
 ## Supported Formats
 
@@ -205,6 +282,7 @@ Output: `.mp4` (H.264 video + AAC audio)
 ## Important Constraints
 
 - Videos must be >= 60 seconds
-- Videos > 30 minutes are automatically chunked for Gemini
-- Gemini free tier has rate limits
+- Groq Whisper: 25MB audio file limit (free tier)
+- OpenAI Whisper: 25MB audio file limit
+- Local Whisper: No limit, but slower on CPU
 - FFmpeg must be installed and in PATH (or specified via --ffmpeg-path)

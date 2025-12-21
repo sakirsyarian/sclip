@@ -14,22 +14,38 @@ from src.services.downloader import (
     YT_DLP_AVAILABLE,
 )
 
-from src.services.gemini import (
-    GeminiClient,
-    GeminiError,
-    GeminiAPIError,
-    GeminiParseError,
-    GeminiUploadError,
-    build_analysis_prompt,
-    parse_response,
-    analyze_video,
-    with_retry,
+from src.services.audio import (
+    extract_audio,
+    get_audio_duration,
+    AudioExtractionError,
 )
 
 from src.services.renderer import (
     VideoRenderer,
     RenderError,
     calculate_crop_params,
+)
+
+# Transcribers
+from src.services.transcribers import (
+    get_transcriber,
+    BaseTranscriber,
+    TranscriptionResult,
+    WordTimestamp,
+    GroqTranscriber,
+    OpenAITranscriber,
+    LocalTranscriber,
+)
+
+# Analyzers
+from src.services.analyzers import (
+    get_analyzer,
+    BaseAnalyzer,
+    AnalysisResult,
+    GroqAnalyzer,
+    GeminiAnalyzer,
+    OpenAIAnalyzer,
+    OllamaAnalyzer,
 )
 
 # Face tracking (optional - may not be installed)
@@ -59,21 +75,31 @@ __all__ = [
     "is_yt_dlp_available",
     "check_yt_dlp_installed",
     "YT_DLP_AVAILABLE",
-    # Gemini
-    "GeminiClient",
-    "GeminiError",
-    "GeminiAPIError",
-    "GeminiParseError",
-    "GeminiUploadError",
-    "build_analysis_prompt",
-    "parse_response",
-    "analyze_video",
-    "with_retry",
+    # Audio
+    "extract_audio",
+    "get_audio_duration",
+    "AudioExtractionError",
+    # Transcribers
+    "get_transcriber",
+    "BaseTranscriber",
+    "TranscriptionResult",
+    "WordTimestamp",
+    "GroqTranscriber",
+    "OpenAITranscriber",
+    "LocalTranscriber",
+    # Analyzers
+    "get_analyzer",
+    "BaseAnalyzer",
+    "AnalysisResult",
+    "GroqAnalyzer",
+    "GeminiAnalyzer",
+    "OpenAIAnalyzer",
+    "OllamaAnalyzer",
     # Renderer
     "VideoRenderer",
     "RenderError",
     "calculate_crop_params",
-    # Face Tracking
+    # Feature flags
     "FACE_TRACKING_AVAILABLE",
 ]
 

@@ -1,6 +1,6 @@
 # SmartClip AI 🎬✨
 
-Transform long-form videos into viral-ready short clips using Google Gemini AI.
+Transform long-form videos into viral-ready short clips using AI.
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -10,11 +10,35 @@ Transform long-form videos into viral-ready short clips using Google Gemini AI.
 SmartClip AI is a CLI tool that automatically identifies the most engaging moments in your videos (podcasts, interviews, webinars) and transforms them into short-form content ready for TikTok, Instagram Reels, and YouTube Shorts.
 
 **Key Features:**
-- 🤖 AI-powered viral moment detection using Google Gemini
+- 🤖 Multi-provider AI support (Groq, Gemini, OpenAI, Ollama)
+- 🎙️ Fast transcription with Whisper (Groq, OpenAI, or local)
 - 📝 Automatic word-level caption generation and burn-in
 - 🎯 Smart cropping to vertical (9:16), square (1:1), or landscape (16:9)
-- 📺 YouTube URL support via yt-dlp
+- � YoOuTube URL support via yt-dlp
 - 📊 SEO-optimized titles and descriptions for each clip
+- 💰 **100% Free** with Groq (default provider)
+- 🔒 **Offline mode** with local Whisper + Ollama
+
+## Architecture (v2)
+
+```
+Video → Extract Audio → Transcribe (Whisper) → Analyze (LLM) → Render
+```
+
+**Transcription Providers:**
+| Provider | Speed | Cost | Offline |
+|----------|-------|------|---------|
+| Groq Whisper | ⚡ Very Fast | Free | ❌ |
+| OpenAI Whisper | Fast | $0.006/min | ❌ |
+| Local (faster-whisper) | Depends on HW | Free | ✅ |
+
+**Analysis Providers:**
+| Provider | Speed | Cost | Offline |
+|----------|-------|------|---------|
+| Groq (Llama 3.3) | ⚡ Very Fast | Free | ❌ |
+| Gemini | Fast | Free tier | ❌ |
+| OpenAI (GPT-4) | Fast | Paid | ❌ |
+| Ollama | Depends on HW | Free | ✅ |
 
 ## 🚀 Try it on Google Colab (No Installation Required!)
 
@@ -42,7 +66,10 @@ Tidak perlu install apa-apa! Jalankan SmartClip AI langsung di browser dengan GP
 
 - Python 3.10+
 - FFmpeg 5.0+
-- Google Gemini API key ([Get one free](https://aistudio.google.com/apikey))
+- API Key (one of):
+  - Groq API key ([Get free](https://console.groq.com)) - **Recommended**
+  - Google Gemini API key ([Get free](https://aistudio.google.com/apikey))
+  - OpenAI API key (paid)
 - yt-dlp (optional, for YouTube downloads)
 
 ## Installation
@@ -100,17 +127,23 @@ pip install yt-dlp
 ### 4. Configure API Key
 
 ```bash
-# Option 1: Set environment variable (recommended)
-export GEMINI_API_KEY="your-api-key-here"
+# Option 1: Groq API key (RECOMMENDED - free & fast)
+export GROQ_API_KEY="your-groq-api-key"
 
-# Option 2: Run setup wizard
+# Option 2: Gemini API key (optional, for Gemini analyzer)
+export GEMINI_API_KEY="your-gemini-api-key"
+
+# Option 3: OpenAI API key (optional, paid)
+export OPENAI_API_KEY="your-openai-api-key"
+
+# Or run setup wizard
 sclip --setup
-
-# Option 3: Pass directly via CLI
-sclip -i video.mp4 --api-key "your-api-key-here"
 ```
 
-Get your free API key from [Google AI Studio](https://aistudio.google.com/apikey).
+Get your free API keys:
+- **Groq**: [console.groq.com](https://console.groq.com) (Recommended)
+- **Gemini**: [aistudio.google.com](https://aistudio.google.com/apikey)
+- **OpenAI**: [platform.openai.com](https://platform.openai.com/api-keys)
 
 ### 5. Verify Installation
 
@@ -125,15 +158,29 @@ Checking dependencies...
 ✓ FFmpeg: 6.0 (/usr/bin/ffmpeg)
 ✓ FFprobe: 6.0 (/usr/bin/ffprobe)
 ✓ yt-dlp: found (/usr/bin/yt-dlp)
-✓ Gemini API key: configured (AIza...xxxx)
+
+API Keys:
+  ✓ GROQ_API_KEY: configured (gsk_...xxxx)
+  ⚠ OPENAI_API_KEY: not configured (optional)
+  ⚠ GEMINI_API_KEY: not configured (optional)
+
+Local Providers:
+  ⚠ faster-whisper: not installed (pip install faster-whisper)
+  ⚠ Ollama: not running (start with 'ollama serve')
 
 All required dependencies are available!
+
+Default setup (100% free):
+  --transcriber groq --analyzer groq
+
+Offline setup:
+  --transcriber local --analyzer ollama
 ```
 
 ## Quick Start
 
 ```bash
-# Process a local video file
+# Process a local video (default: Groq transcription + Groq analysis - FREE)
 sclip -i podcast.mp4
 
 # Process a YouTube video
@@ -142,8 +189,11 @@ sclip -u "https://youtube.com/watch?v=xxxxx"
 # Preview clips without rendering (dry run)
 sclip -i video.mp4 --dry-run
 
-# Generate 3 clips in square format
-sclip -i video.mp4 -n 3 -a 1:1
+# Use Gemini for analysis instead
+sclip -i video.mp4 --analyzer gemini
+
+# Fully offline mode (requires faster-whisper + Ollama)
+sclip -i video.mp4 --transcriber local --analyzer ollama
 ```
 
 ## Usage Examples
@@ -220,9 +270,32 @@ sclip -i video.mp4 -v
 
 # Keep temporary files for inspection
 sclip -i video.mp4 --keep-temp
+```
 
-# Use audio-only mode for faster upload (recommended for large files 1GB+)
-sclip -i large_video.mp4 --audio-only
+### Provider Options
+
+```bash
+# Default: Groq for both transcription and analysis (FREE)
+sclip -i video.mp4
+
+# Use different transcription provider
+sclip -i video.mp4 --transcriber openai    # OpenAI Whisper (paid)
+sclip -i video.mp4 --transcriber local     # Local faster-whisper (offline)
+
+# Use different analysis provider
+sclip -i video.mp4 --analyzer gemini       # Google Gemini
+sclip -i video.mp4 --analyzer openai       # OpenAI GPT-4 (paid)
+sclip -i video.mp4 --analyzer ollama       # Local Ollama (offline)
+
+# Fully offline mode
+sclip -i video.mp4 --transcriber local --analyzer ollama
+
+# Specify models
+sclip -i video.mp4 --transcriber-model whisper-large-v3
+sclip -i video.mp4 --analyzer-model llama-3.3-70b-versatile
+
+# Custom Ollama host
+sclip -i video.mp4 --analyzer ollama --ollama-host http://192.168.1.100:11434
 ```
 
 ### Advanced Options
@@ -234,9 +307,6 @@ sclip -i video.mp4 -f
 # Skip metadata generation (title/description files)
 sclip -i video.mp4 --no-metadata
 
-# Use a specific Gemini model
-sclip -i video.mp4 -m gemini-1.5-pro
-
 # Specify custom FFmpeg path
 sclip -i video.mp4 --ffmpeg-path /opt/ffmpeg/bin/ffmpeg
 
@@ -247,14 +317,17 @@ sclip -i video.mp4 -q
 ### Real-World Workflows
 
 ```bash
-# Podcast episode → TikTok clips
+# Podcast episode → TikTok clips (FREE with Groq)
 sclip -i "podcast_ep42.mp4" -n 5 -a 9:16 -s bold --min-duration 45 --max-duration 120
 
-# Interview → Instagram Reels
-sclip -u "https://youtube.com/watch?v=xxxxx" -n 3 -a 9:16 -s karaoke -o ./reels
+# Interview → Instagram Reels with Gemini analysis
+sclip -u "https://youtube.com/watch?v=xxxxx" -n 3 -a 9:16 -s karaoke --analyzer gemini
 
 # Webinar → LinkedIn clips (square format, minimal captions)
 sclip -i "webinar_recording.mp4" -n 4 -a 1:1 -s minimal --min-duration 45 --max-duration 90
+
+# Offline processing (no internet required)
+sclip -i "confidential_meeting.mp4" --transcriber local --analyzer ollama
 
 # Quick preview before full processing
 sclip -i "long_video.mp4" --dry-run -v
@@ -304,8 +377,14 @@ sclip [OPTIONS]
 
 | Flag | Alias | Default | Description |
 |------|-------|---------|-------------|
-| `--api-key` | | env var | Gemini API key (overrides env/config) |
-| `--model` | `-m` | `gemini-2.0-flash` | Gemini model to use |
+| `--transcriber` | | `groq` | Transcription provider: `groq`, `openai`, `local` |
+| `--analyzer` | | `groq` | Analysis provider: `groq`, `gemini`, `openai`, `ollama` |
+| `--groq-api-key` | | env var | Groq API key |
+| `--openai-api-key` | | env var | OpenAI API key |
+| `--gemini-api-key` | | env var | Gemini API key |
+| `--transcriber-model` | | auto | Model for transcription |
+| `--analyzer-model` | | auto | Model for analysis |
+| `--ollama-host` | | `localhost:11434` | Ollama server URL |
 
 ### Utility Options
 
@@ -318,10 +397,26 @@ sclip [OPTIONS]
 | `--verbose` | `-v` | Show detailed progress |
 | `--quiet` | `-q` | Silent mode, only show errors |
 | `--keep-temp` | | Keep temporary files |
-| `--audio-only` | | Extract audio only for faster upload (recommended for large files) |
 | `--ffmpeg-path` | | Custom FFmpeg binary path |
 | `--version` | | Show version and exit |
 | `--help` | `-h` | Show help message |
+
+### Provider Models
+
+**Transcription (Whisper):**
+| Provider | Models | Default |
+|----------|--------|---------|
+| groq | `whisper-large-v3`, `whisper-large-v3-turbo` | `whisper-large-v3-turbo` |
+| openai | `whisper-1` | `whisper-1` |
+| local | `tiny`, `base`, `small`, `medium`, `large-v3` | `base` |
+
+**Analysis (LLM):**
+| Provider | Models | Default |
+|----------|--------|---------|
+| groq | `llama-3.3-70b-versatile`, `mixtral-8x7b-32768` | `llama-3.3-70b-versatile` |
+| gemini | `gemini-2.0-flash`, `gemini-1.5-pro` | `gemini-2.0-flash` |
+| openai | `gpt-4o`, `gpt-4o-mini` | `gpt-4o-mini` |
+| ollama | Any installed model | `llama3.2` |
 
 ### Flag Conflicts
 
@@ -349,12 +444,19 @@ Location: `~/.sclip/config.json`
 
 ```json
 {
-  "gemini_api_key": "your-api-key",
-  "default_model": "gemini-2.0-flash",
+  "groq_api_key": "your-groq-api-key",
+  "openai_api_key": null,
+  "gemini_api_key": null,
+  "default_transcriber": "groq",
+  "default_analyzer": "groq",
+  "default_transcriber_model": null,
+  "default_analyzer_model": null,
+  "ollama_host": "http://localhost:11434",
   "ffmpeg_path": null,
   "default_output_dir": "./output",
   "default_aspect_ratio": "9:16",
   "default_caption_style": "default",
+  "default_language": "id",
   "max_clips": 5,
   "min_duration": 45,
   "max_duration": 180
@@ -365,7 +467,10 @@ Location: `~/.sclip/config.json`
 
 | Variable | Description |
 |----------|-------------|
+| `GROQ_API_KEY` | Groq API key (transcription + analysis) |
 | `GEMINI_API_KEY` | Google Gemini API key |
+| `OPENAI_API_KEY` | OpenAI API key |
+| `OLLAMA_HOST` | Ollama server URL (default: http://localhost:11434) |
 | `SCLIP_CONFIG` | Custom config file path |
 | `SCLIP_OUTPUT_DIR` | Default output directory |
 
@@ -409,11 +514,12 @@ sclip --setup
 ### API key issues
 
 ```bash
-# Verify API key is set
+# Verify API keys are set
+echo $GROQ_API_KEY
 echo $GEMINI_API_KEY
 
 # Test with explicit key
-sclip -i video.mp4 --api-key "your-key-here"
+sclip -i video.mp4 --groq-api-key "your-key-here"
 
 # Re-run setup
 sclip --setup
@@ -421,16 +527,32 @@ sclip --setup
 
 ### Rate limit exceeded
 
-- Default model `gemini-2.0-flash` is optimized for free tier
+- Groq free tier: 30 requests/minute, 14,400 requests/day
+- Gemini free tier: 15 requests/minute
 - Wait a few minutes and retry
 - Use `--dry-run` to preview before full processing
-- Consider upgrading to paid tier for heavy usage
+
+### Offline mode not working
+
+```bash
+# Check if faster-whisper is installed
+pip install faster-whisper
+
+# Check if Ollama is running
+ollama serve
+
+# List available Ollama models
+ollama list
+
+# Pull a model if needed
+ollama pull llama3.2
+```
 
 ### Video too long
 
-- Videos > 30 minutes are automatically chunked
-- For very long videos (2+ hours), consider splitting manually first
-- Use `--dry-run` to test analysis before rendering
+- New architecture handles any video length (no chunking needed)
+- Audio extraction is fast regardless of video size
+- For very long videos (2+ hours), transcription may take a few minutes
 
 ### No clips found
 
@@ -505,9 +627,20 @@ sclip/
 │   │   ├── clip.py          # Main clipping workflow
 │   │   └── setup.py         # Setup wizard
 │   ├── services/            # Core services
+│   │   ├── audio.py         # Audio extraction
 │   │   ├── downloader.py    # YouTube download
-│   │   ├── gemini.py        # AI analysis
-│   │   └── renderer.py      # Video rendering
+│   │   ├── renderer.py      # Video rendering
+│   │   ├── transcribers/    # Transcription providers
+│   │   │   ├── base.py      # Base transcriber class
+│   │   │   ├── groq.py      # Groq Whisper
+│   │   │   ├── openai.py    # OpenAI Whisper
+│   │   │   └── local.py     # Local faster-whisper
+│   │   └── analyzers/       # Analysis providers
+│   │       ├── base.py      # Base analyzer class
+│   │       ├── groq.py      # Groq LLMs
+│   │       ├── gemini.py    # Google Gemini
+│   │       ├── openai.py    # OpenAI GPT
+│   │       └── ollama.py    # Local Ollama
 │   ├── utils/               # Utilities
 │   │   ├── captions.py      # Caption generation
 │   │   ├── cleanup.py       # Temp file management
@@ -538,7 +671,10 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## Acknowledgments
 
-- [Google Gemini](https://ai.google.dev/) for AI-powered video analysis
+- [Groq](https://groq.com/) for fast, free Whisper and LLM APIs
+- [Google Gemini](https://ai.google.dev/) for AI-powered analysis
+- [OpenAI](https://openai.com/) for Whisper and GPT models
+- [Ollama](https://ollama.ai/) for local LLM inference
 - [FFmpeg](https://ffmpeg.org/) for video processing
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp) for YouTube downloads
 - [Click](https://click.palletsprojects.com/) for CLI framework

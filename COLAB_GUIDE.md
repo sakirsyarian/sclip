@@ -37,11 +37,19 @@ Sebelum mulai, pastikan kamu punya:
 ### 1. Akun Google
 - Jika belum punya, buat di [accounts.google.com](https://accounts.google.com)
 
-### 2. Gemini API Key (GRATIS)
+### 2. API Key (GRATIS dengan Groq!)
+
+**Groq API Key (Recommended - GRATIS):**
+1. Buka [Groq Console](https://console.groq.com)
+2. Login dengan Google atau GitHub
+3. Klik **"API Keys"** → **"Create API Key"**
+4. Copy API key yang muncul
+
+**Gemini API Key (Alternatif):**
 1. Buka [Google AI Studio](https://aistudio.google.com/apikey)
 2. Login dengan akun Google
 3. Klik **"Create API Key"**
-4. Copy API key yang muncul (simpan di tempat aman!)
+4. Copy API key yang muncul
 
 ![Get API Key](https://ai.google.dev/static/images/aistudio-api-key.png)
 
@@ -114,16 +122,16 @@ GPU membuat proses face tracking lebih cepat.
 
 ### Langkah 3: Masukkan API Key
 
-1. Klik cell kedua (🔑 Enter Gemini API Key)
+1. Klik cell kedua (🔑 Enter API Key)
 2. Jalankan cell (klik Play atau Ctrl+Enter)
-3. Akan muncul kotak input, paste API key kamu
+3. Akan muncul kotak input, paste **Groq API key** kamu
 4. Tekan Enter
 5. Pastikan muncul "✅ API key configured"
 
 **Tips:** Untuk menyimpan API key agar tidak perlu input ulang:
 1. Klik ikon 🔑 di sidebar kiri (Secrets)
 2. Klik **Add new secret**
-3. Name: `GEMINI_API_KEY`
+3. Name: `GROQ_API_KEY`
 4. Value: (paste API key kamu)
 5. Toggle **Notebook access** ke ON
 
@@ -193,7 +201,7 @@ GPU membuat proses face tracking lebih cepat.
 
 ### ❌ Error: "RESOURCE_EXHAUSTED" atau "429"
 
-**Penyebab:** Rate limit Gemini API (terlalu banyak request)
+**Penyebab:** Rate limit API (terlalu banyak request)
 
 **Solusi:**
 - Tunggu 1-2 menit, lalu coba lagi

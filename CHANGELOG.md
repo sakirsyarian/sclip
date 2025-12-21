@@ -5,6 +5,81 @@ All notable changes to SmartClip AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2024-12-21
+
+### Changed
+- **Improved Setup Wizard** (`sclip --setup`)
+  - Now supports all API keys: Groq (default), OpenAI, Gemini
+  - Added default provider selection (transcriber & analyzer)
+  - Added local/offline options setup (Ollama, faster-whisper)
+  - Added default settings configuration (language, aspect ratio, caption style)
+  - Groq highlighted as FREE and recommended
+- **Updated Config System**
+  - Config now stores all API keys (groq, openai, gemini)
+  - Added default provider settings
+  - Added language preference
+  - New helper functions: `get_groq_api_key()`, `get_openai_api_key()`, `get_gemini_api_key()`, `get_ollama_host()`
+- **Improved `--check-deps`**
+  - Shows Groq as default with "[DEFAULT - FREE]" label
+  - Better messaging for missing API keys
+
+### Fixed
+- Setup wizard now asks for Groq API key first (was only asking for Gemini)
+- API key resolution now properly checks CLI → env var → config file
+
+## [0.2.0] - 2024-12-21
+
+### Added
+
+#### Multi-Provider Architecture
+- **Transcription Providers**: Support for multiple speech-to-text backends
+  - Groq Whisper API (default, free, fast)
+  - OpenAI Whisper API (paid, high quality)
+  - Local faster-whisper (offline, no API needed)
+- **Analysis Providers**: Support for multiple LLM backends
+  - Groq LLMs (default, free, very fast) - Llama 3.3, Mixtral
+  - Google Gemini (free tier available)
+  - OpenAI GPT-4 (paid, high quality)
+  - Ollama (offline, local LLMs)
+
+#### New CLI Options
+- `--transcriber` - Choose transcription provider (groq, openai, local)
+- `--analyzer` - Choose analysis provider (groq, gemini, openai, ollama)
+- `--groq-api-key` - Groq API key
+- `--openai-api-key` - OpenAI API key
+- `--gemini-api-key` - Gemini API key
+- `--transcriber-model` - Custom model for transcription
+- `--analyzer-model` - Custom model for analysis
+- `--ollama-host` - Custom Ollama server URL
+
+#### New Services
+- `src/services/audio.py` - Audio extraction from video
+- `src/services/transcribers/` - Transcription provider modules
+- `src/services/analyzers/` - Analysis provider modules
+
+### Changed
+- **Default provider changed from Gemini to Groq** (100% free)
+- New workflow: Video → Audio → Transcribe → Analyze → Render
+- Removed video upload to AI (now uses audio-only approach)
+- Removed chunking logic (no longer needed with audio transcription)
+- Updated `--check-deps` to show all provider statuses
+
+### Removed
+- `--audio-only` flag (now always uses audio extraction)
+- `--model` flag (replaced by `--analyzer-model`)
+- `--api-key` flag (replaced by provider-specific flags)
+- Video chunking for long videos (no longer needed)
+
+### Performance
+- Faster processing: Audio extraction is much faster than video upload
+- No file size limits for local transcription
+- Parallel rendering for multiple clips
+
+### Documentation
+- Updated README with new architecture and provider options
+- Updated AGENTS.md with new service structure
+- Added provider comparison tables
+
 ## [Unreleased]
 
 ### Added
@@ -87,25 +162,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Architecture
 - Layered architecture: CLI → Commands → Services → Utils
-- Service-based design: Downloader, Gemini, Renderer
+- Multi-provider design: Transcribers (Groq, OpenAI, Local) + Analyzers (Groq, Gemini, OpenAI, Ollama)
 - Utility modules: validation, config, logger, cleanup, ffmpeg, captions, video
 
 ### Known Limitations
 - Videos must be at least 60 seconds long
-- Videos longer than 30 minutes are automatically chunked for Gemini API
-- Gemini free tier has rate limits
+- Groq/OpenAI Whisper API: 25MB audio file limit
+- Free tier providers have rate limits
 - No GUI (CLI only for MVP)
 - No direct social media posting
-- No face tracking/speaker detection
 
 ---
 
 ## Future Releases
-
-### Planned for v0.2.0
-- Unit tests for utility modules
-- Integration tests for services
-- CI/CD pipeline setup
 
 ### Planned for v1.0.0
 - Face tracking and speaker detection
@@ -114,4 +183,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Batch processing mode
 - Custom caption templates
 
+[0.2.0]: https://github.com/sarian/sclip/releases/tag/v0.2.0
 [0.1.0]: https://github.com/sarian/sclip/releases/tag/v0.1.0

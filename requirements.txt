@@ -4,8 +4,16 @@
 # Core dependencies
 click>=8.1.0
 rich>=13.0.0
-google-genai>=1.0.0
 yt-dlp>=2024.1.0
+
+# Transcription providers
+groq>=0.4.0                    # Groq Whisper API (free, fast)
+openai>=1.0.0                  # OpenAI Whisper API (optional)
+faster-whisper>=1.0.0          # Local Whisper (optional, for offline)
+
+# Analysis providers
+google-genai>=1.0.0            # Google Gemini (optional)
+httpx>=0.25.0                  # For Ollama API calls
 
 # Face tracking (optional but recommended)
 mediapipe>=0.10.0

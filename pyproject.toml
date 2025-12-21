@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sclip"
-version = "0.1.0"
-description = "SmartClip AI - Transform long-form videos into viral-ready short clips using Google Gemini AI"
+version = "0.2.0"
+description = "SmartClip AI - Transform long-form videos into viral-ready short clips using AI"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.10"
@@ -16,13 +16,16 @@ keywords = [
     "video",
     "clips",
     "ai",
+    "whisper",
+    "groq",
     "gemini",
     "youtube",
     "tiktok",
     "reels",
     "shorts",
     "captions",
-    "ffmpeg"
+    "ffmpeg",
+    "transcription"
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -42,11 +45,26 @@ classifiers = [
 dependencies = [
     "click>=8.1.0",
     "rich>=13.0.0",
-    "google-genai>=1.0.0",
+    "groq>=0.4.0",
     "yt-dlp>=2024.1.0",
+    "httpx>=0.25.0",
 ]
 
 [project.optional-dependencies]
+gemini = [
+    "google-genai>=1.0.0",
+]
+openai = [
+    "openai>=1.0.0",
+]
+local = [
+    "faster-whisper>=1.0.0",
+]
+all = [
+    "google-genai>=1.0.0",
+    "openai>=1.0.0",
+    "faster-whisper>=1.0.0",
+]
 dev = [
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",

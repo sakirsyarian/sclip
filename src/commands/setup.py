@@ -1,35 +1,12 @@
-"""Dependency setup wizard for SmartClip AI.
+"""Setup wizard for SmartClip AI.
 
-This module provides an interactive setup wizard that guides users through
-configuring SmartClip AI for first use. It handles:
+Interactive setup wizard that guides users through configuring SmartClip AI.
+Handles API keys for all providers (Groq, OpenAI, Gemini), FFmpeg, and yt-dlp.
 
-Setup Steps:
-    1. Display current dependency status
-    2. Configure Gemini API key (with instructions to get one)
-    3. FFmpeg installation guidance (platform-specific)
-    4. yt-dlp installation guidance (optional, for YouTube)
-    5. Save configuration to ~/.sclip/config.json
-
-Platform Support:
-    The wizard provides platform-specific installation instructions for:
-    - Windows: Chocolatey, Scoop, manual download
-    - macOS: Homebrew, MacPorts, manual download
-    - Linux: apt, dnf, pacman, manual download
-
-API Key Setup:
-    Users are guided to:
-    1. Visit Google AI Studio (https://aistudio.google.com/app/apikey)
-    2. Sign in with Google account
-    3. Create and copy API key
-    4. Enter key in wizard (stored securely in config)
+Default provider is Groq (FREE) for both transcription and analysis.
 
 Usage:
-    # From CLI
     sclip --setup
-    
-    # Programmatically
-    from src.commands.setup import run_setup_wizard
-    exit_code = run_setup_wizard()
 """
 
 import shutil
@@ -38,33 +15,29 @@ from typing import Optional
 
 from rich.prompt import Prompt, Confirm
 from rich.table import Table
+from rich.panel import Panel
 
-from src.types import ExitCode, Config
+from src.types import ExitCode, Config, TranscriberProvider, AnalyzerProvider
 from src.utils.config import (
     load_config,
     save_config,
-    get_api_key,
     get_config_path,
-    ENV_API_KEY,
+    get_groq_api_key,
+    get_openai_api_key,
+    get_gemini_api_key,
+    ENV_GROQ_API_KEY,
+    ENV_OPENAI_API_KEY,
+    ENV_GEMINI_API_KEY,
 )
 from src.utils.ffmpeg import check_dependencies, find_ffmpeg, find_ffprobe
 from src.utils.logger import get_logger
 
 
-# Installation URLs for dependencies
-# These are the official/recommended sources for each platform
-FFMPEG_URLS = {
-    "win32": "https://www.gyan.dev/ffmpeg/builds/",      # Gyan.dev builds (recommended for Windows)
-    "darwin": "https://formulae.brew.sh/formula/ffmpeg", # Homebrew formula
-    "linux": "https://ffmpeg.org/download.html#build-linux",  # Official FFmpeg downloads
-}
-
-# yt-dlp installation command and documentation URL
-YTDLP_INSTALL_CMD = "pip install yt-dlp"
-YTDLP_URL = "https://github.com/yt-dlp/yt-dlp#installation"
-
-# Google AI Studio URL for getting Gemini API key
+# API URLs
+GROQ_API_URL = "https://console.groq.com/keys"
+OPENAI_API_URL = "https://platform.openai.com/api-keys"
 GEMINI_API_URL = "https://aistudio.google.com/app/apikey"
+OLLAMA_URL = "https://ollama.ai/download"
 
 
 def _get_platform_name() -> str:
@@ -73,8 +46,14 @@ def _get_platform_name() -> str:
         return "Windows"
     elif sys.platform == "darwin":
         return "macOS"
-    else:
-        return "Linux"
+    return "Linux"
+
+
+def _mask_key(key: str) -> str:
+    """Mask API key for display."""
+    if len(key) > 8:
+        return key[:4] + "..." + key[-4:]
+    return "***"
 
 
 def _get_ffmpeg_install_instructions() -> list[str]:
@@ -83,89 +62,40 @@ def _get_ffmpeg_install_instructions() -> list[str]:
     if platform.startswith("linux"):
         platform = "linux"
     
-    instructions = []
-    
     if platform == "win32":
-        instructions = [
-            "Option 1: Download from https://www.gyan.dev/ffmpeg/builds/",
-            "  - Download 'ffmpeg-release-essentials.zip'",
-            "  - Extract to C:\\ffmpeg",
-            "  - Add C:\\ffmpeg\\bin to your PATH",
-            "",
-            "Option 2: Using Chocolatey:",
+        return [
+            "Option 1: Using Chocolatey:",
             "  choco install ffmpeg",
             "",
-            "Option 3: Using Scoop:",
+            "Option 2: Using Scoop:",
             "  scoop install ffmpeg",
+            "",
+            "Option 3: Manual download:",
+            "  https://www.gyan.dev/ffmpeg/builds/",
         ]
     elif platform == "darwin":
-        instructions = [
-            "Option 1: Using Homebrew (recommended):",
+        return [
+            "Using Homebrew (recommended):",
             "  brew install ffmpeg",
-            "",
-            "Option 2: Using MacPorts:",
-            "  sudo port install ffmpeg",
-            "",
-            "Option 3: Download from https://evermeet.cx/ffmpeg/",
         ]
-    else:  # Linux
-        instructions = [
-            "Ubuntu/Debian:",
-            "  sudo apt update && sudo apt install ffmpeg",
-            "",
-            "Fedora:",
-            "  sudo dnf install ffmpeg",
-            "",
-            "Arch Linux:",
-            "  sudo pacman -S ffmpeg",
-            "",
-            "Or download from: https://ffmpeg.org/download.html",
+    else:
+        return [
+            "Ubuntu/Debian: sudo apt install ffmpeg",
+            "Fedora: sudo dnf install ffmpeg",
+            "Arch: sudo pacman -S ffmpeg",
         ]
-    
-    return instructions
 
 
 def _get_ytdlp_install_instructions() -> list[str]:
     """Get yt-dlp installation instructions."""
-    instructions = [
-        "Option 1: Using pip (recommended):",
+    return [
+        "Using pip (recommended):",
         "  pip install yt-dlp",
-        "",
-        "Option 2: Using pipx:",
-        "  pipx install yt-dlp",
     ]
-    
-    if sys.platform == "win32":
-        instructions.extend([
-            "",
-            "Option 3: Using Chocolatey:",
-            "  choco install yt-dlp",
-            "",
-            "Option 4: Using Scoop:",
-            "  scoop install yt-dlp",
-        ])
-    elif sys.platform == "darwin":
-        instructions.extend([
-            "",
-            "Option 3: Using Homebrew:",
-            "  brew install yt-dlp",
-        ])
-    else:
-        instructions.extend([
-            "",
-            "Option 3: Using your package manager (may be outdated):",
-            "  sudo apt install yt-dlp  # Debian/Ubuntu",
-        ])
-    
-    return instructions
 
 
 def _check_current_status() -> dict:
-    """Check current status of all dependencies.
-    
-    Returns:
-        Dictionary with status of each dependency
-    """
+    """Check current status of all dependencies and API keys."""
     status = {}
     
     # Check FFmpeg/FFprobe
@@ -178,38 +108,50 @@ def _check_current_status() -> dict:
     status["ffprobe"] = {
         "found": deps.ffprobe_found,
         "path": deps.ffprobe_path,
-        "version": deps.ffprobe_version,
     }
     
     # Check yt-dlp
     ytdlp_path = shutil.which("yt-dlp")
-    status["ytdlp"] = {
-        "found": ytdlp_path is not None,
-        "path": ytdlp_path,
+    status["ytdlp"] = {"found": ytdlp_path is not None, "path": ytdlp_path}
+    
+    # Check API keys
+    groq_key = get_groq_api_key()
+    openai_key = get_openai_api_key()
+    gemini_key = get_gemini_api_key()
+    
+    status["groq_api_key"] = {
+        "configured": groq_key is not None,
+        "masked": _mask_key(groq_key) if groq_key else None,
+    }
+    status["openai_api_key"] = {
+        "configured": openai_key is not None,
+        "masked": _mask_key(openai_key) if openai_key else None,
+    }
+    status["gemini_api_key"] = {
+        "configured": gemini_key is not None,
+        "masked": _mask_key(gemini_key) if gemini_key else None,
     }
     
-    # Check API key
-    api_key = get_api_key()
-    status["api_key"] = {
-        "configured": api_key is not None,
-        "masked": _mask_key(api_key) if api_key else None,
-    }
+    # Check Ollama
+    try:
+        import httpx
+        response = httpx.get("http://localhost:11434/api/tags", timeout=2)
+        status["ollama"] = {"running": response.status_code == 200}
+    except Exception:
+        status["ollama"] = {"running": False}
     
-    # Check Python version
+    # Check faster-whisper
+    try:
+        import faster_whisper
+        status["faster_whisper"] = {"installed": True}
+    except ImportError:
+        status["faster_whisper"] = {"installed": False}
+    
+    # Python version
     py_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
-    status["python"] = {
-        "version": py_version,
-        "ok": sys.version_info >= (3, 10),
-    }
+    status["python"] = {"version": py_version, "ok": sys.version_info >= (3, 10)}
     
     return status
-
-
-def _mask_key(key: str) -> str:
-    """Mask API key for display."""
-    if len(key) > 8:
-        return key[:4] + "..." + key[-4:]
-    return "***"
 
 
 def _display_status_table(status: dict) -> None:
@@ -219,252 +161,388 @@ def _display_status_table(status: dict) -> None:
     
     table = Table(title="Current Status", show_header=True, header_style="bold cyan")
     table.add_column("Component", style="cyan")
-    table.add_column("Status", style="white")
+    table.add_column("Status")
     table.add_column("Details", style="dim")
     
     # Python
-    py_status = "✓ OK" if status["python"]["ok"] else "✗ Outdated"
-    py_style = "green" if status["python"]["ok"] else "red"
+    py_ok = status["python"]["ok"]
     table.add_row(
         "Python",
-        f"[{py_style}]{py_status}[/{py_style}]",
+        f"[green]✓ OK[/green]" if py_ok else "[red]✗ Outdated[/red]",
         f"v{status['python']['version']} (requires 3.10+)"
     )
     
     # FFmpeg
     if status["ffmpeg"]["found"]:
-        ffmpeg_status = "✓ Found"
-        ffmpeg_style = "green"
-        ffmpeg_details = f"v{status['ffmpeg']['version'] or 'unknown'}"
+        table.add_row("FFmpeg", "[green]✓ Found[/green]", f"v{status['ffmpeg']['version'] or 'unknown'}")
     else:
-        ffmpeg_status = "✗ Not found"
-        ffmpeg_style = "red"
-        ffmpeg_details = "Required for video processing"
-    table.add_row(
-        "FFmpeg",
-        f"[{ffmpeg_style}]{ffmpeg_status}[/{ffmpeg_style}]",
-        ffmpeg_details
-    )
-    
-    # FFprobe
-    if status["ffprobe"]["found"]:
-        ffprobe_status = "✓ Found"
-        ffprobe_style = "green"
-        ffprobe_details = f"v{status['ffprobe']['version'] or 'unknown'}"
-    else:
-        ffprobe_status = "✗ Not found"
-        ffprobe_style = "red"
-        ffprobe_details = "Required for video analysis"
-    table.add_row(
-        "FFprobe",
-        f"[{ffprobe_style}]{ffprobe_status}[/{ffprobe_style}]",
-        ffprobe_details
-    )
+        table.add_row("FFmpeg", "[red]✗ Not found[/red]", "Required for video processing")
     
     # yt-dlp
     if status["ytdlp"]["found"]:
-        ytdlp_status = "✓ Found"
-        ytdlp_style = "green"
-        ytdlp_details = "YouTube downloads enabled"
+        table.add_row("yt-dlp", "[green]✓ Found[/green]", "YouTube downloads enabled")
     else:
-        ytdlp_status = "○ Not found"
-        ytdlp_style = "yellow"
-        ytdlp_details = "Optional - for YouTube URLs"
-    table.add_row(
-        "yt-dlp",
-        f"[{ytdlp_style}]{ytdlp_status}[/{ytdlp_style}]",
-        ytdlp_details
-    )
-    
-    # API Key
-    if status["api_key"]["configured"]:
-        api_status = "✓ Configured"
-        api_style = "green"
-        api_details = status["api_key"]["masked"]
-    else:
-        api_status = "✗ Not configured"
-        api_style = "red"
-        api_details = "Required for AI analysis"
-    table.add_row(
-        "Gemini API Key",
-        f"[{api_style}]{api_status}[/{api_style}]",
-        api_details
-    )
+        table.add_row("yt-dlp", "[yellow]○ Not found[/yellow]", "Optional - for YouTube URLs")
     
     console.print()
     console.print(table)
+    
+    # API Keys table
+    api_table = Table(title="API Keys", show_header=True, header_style="bold cyan")
+    api_table.add_column("Provider", style="cyan")
+    api_table.add_column("Status")
+    api_table.add_column("Details", style="dim")
+    
+    # Groq (default - FREE)
+    if status["groq_api_key"]["configured"]:
+        api_table.add_row("Groq [bold](DEFAULT)[/bold]", "[green]✓ Configured[/green]", status["groq_api_key"]["masked"])
+    else:
+        api_table.add_row("Groq [bold](DEFAULT)[/bold]", "[red]✗ Not configured[/red]", "FREE - Recommended!")
+    
+    # OpenAI
+    if status["openai_api_key"]["configured"]:
+        api_table.add_row("OpenAI", "[green]✓ Configured[/green]", status["openai_api_key"]["masked"])
+    else:
+        api_table.add_row("OpenAI", "[dim]○ Not configured[/dim]", "Optional - Paid")
+    
+    # Gemini
+    if status["gemini_api_key"]["configured"]:
+        api_table.add_row("Gemini", "[green]✓ Configured[/green]", status["gemini_api_key"]["masked"])
+    else:
+        api_table.add_row("Gemini", "[dim]○ Not configured[/dim]", "Optional - Free tier")
+    
+    # Ollama
+    if status["ollama"]["running"]:
+        api_table.add_row("Ollama", "[green]✓ Running[/green]", "localhost:11434")
+    else:
+        api_table.add_row("Ollama", "[dim]○ Not running[/dim]", "Optional - Local LLM")
+    
+    # Local Whisper
+    if status["faster_whisper"]["installed"]:
+        api_table.add_row("Local Whisper", "[green]✓ Installed[/green]", "faster-whisper")
+    else:
+        api_table.add_row("Local Whisper", "[dim]○ Not installed[/dim]", "Optional - Offline")
+    
+    console.print()
+    console.print(api_table)
     console.print()
 
 
-def _setup_api_key(current_config: Config) -> Optional[str]:
-    """Interactive API key setup.
-    
-    Args:
-        current_config: Current configuration
-        
-    Returns:
-        New API key or None if skipped
-    """
+def _setup_groq_api_key(current_config: Config) -> Optional[str]:
+    """Setup Groq API key (default provider - FREE)."""
     logger = get_logger()
     console = logger.console
     
-    console.print("\n[bold cyan]━━━ Gemini API Key Setup ━━━[/bold cyan]\n")
-    
-    # Check if already configured
-    existing_key = get_api_key()
-    if existing_key:
-        console.print(f"[green]✓[/green] API key already configured: {_mask_key(existing_key)}")
-        if not Confirm.ask("Do you want to update it?", default=False):
-            return None
-    
-    console.print("To get a Gemini API key:")
-    console.print(f"  1. Visit: [link={GEMINI_API_URL}]{GEMINI_API_URL}[/link]")
-    console.print("  2. Sign in with your Google account")
-    console.print("  3. Click 'Create API key'")
-    console.print("  4. Copy the generated key")
+    console.print("\n[bold cyan]━━━ Groq API Key (FREE - Recommended) ━━━[/bold cyan]\n")
+    console.print("[green]Groq is the default provider - completely FREE![/green]")
+    console.print("Used for both transcription (Whisper) and analysis (Llama 3.3)")
     console.print()
     
-    # Prompt for API key
-    api_key = Prompt.ask(
-        "Enter your Gemini API key (or press Enter to skip)",
-        default="",
-        password=True
-    )
+    existing_key = get_groq_api_key()
+    if existing_key:
+        console.print(f"[green]✓[/green] Already configured: {_mask_key(existing_key)}")
+        if not Confirm.ask("Update Groq API key?", default=False):
+            return None
+    
+    console.print("To get a FREE Groq API key:")
+    console.print(f"  1. Visit: [link={GROQ_API_URL}]{GROQ_API_URL}[/link]")
+    console.print("  2. Sign up / Sign in")
+    console.print("  3. Create API key")
+    console.print()
+    
+    api_key = Prompt.ask("Enter Groq API key (or Enter to skip)", default="", password=True)
     
     if api_key.strip():
         return api_key.strip()
     
-    console.print("[yellow]⚠[/yellow] Skipped API key setup")
-    console.print(f"  You can set it later via {ENV_API_KEY} environment variable")
-    console.print(f"  or by running 'sclip --setup' again")
+    console.print(f"[yellow]⚠[/yellow] Skipped. Set {ENV_GROQ_API_KEY} env var or run setup again.")
     return None
 
 
-def _setup_ffmpeg() -> Optional[str]:
-    """Interactive FFmpeg setup guidance.
+def _setup_openai_api_key(current_config: Config) -> Optional[str]:
+    """Setup OpenAI API key (optional - paid)."""
+    logger = get_logger()
+    console = logger.console
     
-    Returns:
-        Custom FFmpeg path if provided, None otherwise
-    """
+    console.print("\n[bold cyan]━━━ OpenAI API Key (Optional - Paid) ━━━[/bold cyan]\n")
+    console.print("OpenAI provides high-quality transcription and analysis.")
+    console.print("[yellow]Note: This is a paid service.[/yellow]")
+    console.print()
+    
+    existing_key = get_openai_api_key()
+    if existing_key:
+        console.print(f"[green]✓[/green] Already configured: {_mask_key(existing_key)}")
+        if not Confirm.ask("Update OpenAI API key?", default=False):
+            return None
+    
+    if not Confirm.ask("Configure OpenAI API key?", default=False):
+        return None
+    
+    console.print(f"  Get key at: [link={OPENAI_API_URL}]{OPENAI_API_URL}[/link]")
+    console.print()
+    
+    api_key = Prompt.ask("Enter OpenAI API key", default="", password=True)
+    return api_key.strip() if api_key.strip() else None
+
+
+def _setup_gemini_api_key(current_config: Config) -> Optional[str]:
+    """Setup Gemini API key (optional - free tier)."""
+    logger = get_logger()
+    console = logger.console
+    
+    console.print("\n[bold cyan]━━━ Gemini API Key (Optional - Free Tier) ━━━[/bold cyan]\n")
+    console.print("Google Gemini for analysis (large context window).")
+    console.print("[yellow]Note: Only supports English transcription.[/yellow]")
+    console.print()
+    
+    existing_key = get_gemini_api_key()
+    if existing_key:
+        console.print(f"[green]✓[/green] Already configured: {_mask_key(existing_key)}")
+        if not Confirm.ask("Update Gemini API key?", default=False):
+            return None
+    
+    if not Confirm.ask("Configure Gemini API key?", default=False):
+        return None
+    
+    console.print(f"  Get key at: [link={GEMINI_API_URL}]{GEMINI_API_URL}[/link]")
+    console.print()
+    
+    api_key = Prompt.ask("Enter Gemini API key", default="", password=True)
+    return api_key.strip() if api_key.strip() else None
+
+
+def _setup_default_providers(current_config: Config) -> tuple[Optional[TranscriberProvider], Optional[AnalyzerProvider]]:
+    """Setup default transcriber and analyzer providers."""
+    logger = get_logger()
+    console = logger.console
+    
+    console.print("\n[bold cyan]━━━ Default Providers ━━━[/bold cyan]\n")
+    
+    console.print("Available transcribers:")
+    console.print("  [green]1. groq[/green]  - Groq Whisper (FREE, fast, recommended)")
+    console.print("  2. openai - OpenAI Whisper (paid)")
+    console.print("  3. local  - faster-whisper (offline, slower)")
+    console.print()
+    
+    transcriber_choice = Prompt.ask(
+        "Default transcriber",
+        choices=["groq", "openai", "local", ""],
+        default=current_config.default_transcriber
+    )
+    
+    console.print()
+    console.print("Available analyzers:")
+    console.print("  [green]1. groq[/green]   - Groq Llama 3.3 (FREE, fast, recommended)")
+    console.print("  2. gemini - Google Gemini (free tier)")
+    console.print("  3. openai - OpenAI GPT-4 (paid)")
+    console.print("  4. ollama - Local LLM (offline)")
+    console.print()
+    
+    analyzer_choice = Prompt.ask(
+        "Default analyzer",
+        choices=["groq", "gemini", "openai", "ollama", ""],
+        default=current_config.default_analyzer
+    )
+    
+    transcriber = transcriber_choice if transcriber_choice else None
+    analyzer = analyzer_choice if analyzer_choice else None
+    
+    return transcriber, analyzer
+
+
+def _setup_ffmpeg(current_config: Config) -> Optional[str]:
+    """Setup FFmpeg path."""
     logger = get_logger()
     console = logger.console
     
     console.print("\n[bold cyan]━━━ FFmpeg Setup ━━━[/bold cyan]\n")
     
-    # Check current status
     deps = check_dependencies()
     
     if deps.ffmpeg_found and deps.ffprobe_found:
         console.print(f"[green]✓[/green] FFmpeg found: {deps.ffmpeg_path}")
         console.print(f"[green]✓[/green] FFprobe found: {deps.ffprobe_path}")
         
-        if Confirm.ask("FFmpeg is already installed. Do you want to use a different path?", default=False):
-            custom_path = Prompt.ask("Enter custom FFmpeg directory path", default="")
-            if custom_path.strip():
-                # Verify the path
-                test_ffmpeg = find_ffmpeg(custom_path.strip())
-                test_ffprobe = find_ffprobe(custom_path.strip())
-                if test_ffmpeg and test_ffprobe:
-                    console.print(f"[green]✓[/green] Found FFmpeg at: {test_ffmpeg}")
-                    return custom_path.strip()
-                else:
-                    console.print("[red]✗[/red] FFmpeg not found at that path")
-        return None
+        if not Confirm.ask("Use a different FFmpeg path?", default=False):
+            return None
+    else:
+        console.print("[yellow]⚠[/yellow] FFmpeg not found")
+        console.print()
+        console.print(f"[bold]Installation for {_get_platform_name()}:[/bold]")
+        for line in _get_ffmpeg_install_instructions():
+            console.print(f"  {line}")
+        console.print()
     
-    # FFmpeg not found - show installation instructions
-    console.print("[yellow]⚠[/yellow] FFmpeg not found on your system")
-    console.print()
-    
-    platform_name = _get_platform_name()
-    console.print(f"[bold]Installation instructions for {platform_name}:[/bold]")
-    console.print()
-    
-    for line in _get_ffmpeg_install_instructions():
-        console.print(f"  {line}")
-    
-    console.print()
-    
-    # Ask if they want to provide a custom path
-    if Confirm.ask("Do you have FFmpeg installed at a custom location?", default=False):
-        custom_path = Prompt.ask("Enter FFmpeg directory path")
+    if Confirm.ask("Specify custom FFmpeg path?", default=False):
+        custom_path = Prompt.ask("FFmpeg directory path")
         if custom_path.strip():
             test_ffmpeg = find_ffmpeg(custom_path.strip())
             test_ffprobe = find_ffprobe(custom_path.strip())
             if test_ffmpeg and test_ffprobe:
                 console.print(f"[green]✓[/green] Found FFmpeg at: {test_ffmpeg}")
                 return custom_path.strip()
-            else:
-                console.print("[red]✗[/red] FFmpeg not found at that path")
+            console.print("[red]✗[/red] FFmpeg not found at that path")
     
-    console.print()
-    console.print("[dim]After installing FFmpeg, run 'sclip --check-deps' to verify[/dim]")
     return None
 
 
 def _setup_ytdlp() -> None:
-    """Interactive yt-dlp setup guidance."""
+    """Show yt-dlp installation guidance."""
     logger = get_logger()
     console = logger.console
     
     console.print("\n[bold cyan]━━━ yt-dlp Setup (Optional) ━━━[/bold cyan]\n")
     
-    # Check current status
     ytdlp_path = shutil.which("yt-dlp")
     
     if ytdlp_path:
         console.print(f"[green]✓[/green] yt-dlp found: {ytdlp_path}")
-        console.print("  YouTube URL downloads are enabled")
         return
     
     console.print("[yellow]○[/yellow] yt-dlp not found (optional)")
-    console.print("  yt-dlp is only needed if you want to process YouTube URLs")
+    console.print("  Only needed for YouTube URL downloads")
     console.print()
     
-    if Confirm.ask("Do you want to see installation instructions?", default=True):
-        console.print()
-        console.print("[bold]Installation instructions:[/bold]")
-        console.print()
-        
+    if Confirm.ask("Show installation instructions?", default=False):
         for line in _get_ytdlp_install_instructions():
             console.print(f"  {line}")
-        
-        console.print()
-        console.print(f"  More info: [link={YTDLP_URL}]{YTDLP_URL}[/link]")
+
+
+def _setup_local_options(current_config: Config) -> tuple[Optional[str], bool]:
+    """Setup local/offline options (Ollama, faster-whisper)."""
+    logger = get_logger()
+    console = logger.console
+    
+    console.print("\n[bold cyan]━━━ Local/Offline Options ━━━[/bold cyan]\n")
+    
+    ollama_host = None
+    install_whisper = False
+    
+    # Ollama
+    console.print("[bold]Ollama[/bold] - Local LLM for analysis (offline)")
+    try:
+        import httpx
+        response = httpx.get("http://localhost:11434/api/tags", timeout=2)
+        if response.status_code == 200:
+            console.print("[green]✓[/green] Ollama is running on localhost:11434")
+        else:
+            console.print("[yellow]○[/yellow] Ollama not responding")
+    except Exception:
+        console.print("[yellow]○[/yellow] Ollama not running")
+        console.print(f"  Install from: [link={OLLAMA_URL}]{OLLAMA_URL}[/link]")
+    
+    if Confirm.ask("Use custom Ollama host?", default=False):
+        host = Prompt.ask("Ollama host URL", default=current_config.ollama_host)
+        if host.strip():
+            ollama_host = host.strip()
+    
+    console.print()
+    
+    # faster-whisper
+    console.print("[bold]faster-whisper[/bold] - Local transcription (offline)")
+    try:
+        import faster_whisper
+        console.print("[green]✓[/green] faster-whisper is installed")
+    except ImportError:
+        console.print("[yellow]○[/yellow] faster-whisper not installed")
+        console.print("  Install with: pip install faster-whisper")
+        if Confirm.ask("Show installation command?", default=False):
+            console.print()
+            console.print("  [bold]pip install faster-whisper[/bold]")
+            console.print()
+            console.print("  Note: First run will download the model (~150MB for 'base')")
+    
+    return ollama_host, install_whisper
+
+
+def _setup_defaults(current_config: Config) -> dict:
+    """Setup default output settings."""
+    logger = get_logger()
+    console = logger.console
+    
+    console.print("\n[bold cyan]━━━ Default Settings ━━━[/bold cyan]\n")
+    
+    if not Confirm.ask("Configure default settings?", default=False):
+        return {}
+    
+    settings = {}
+    
+    # Language
+    console.print()
+    console.print("Default language for transcription:")
+    console.print("  id = Indonesian, en = English, etc.")
+    lang = Prompt.ask("Language code", default=current_config.default_language)
+    if lang.strip():
+        settings["language"] = lang.strip()
+    
+    # Aspect ratio
+    console.print()
+    console.print("Default aspect ratio:")
+    console.print("  9:16 = TikTok/Reels, 1:1 = Instagram, 16:9 = YouTube")
+    ratio = Prompt.ask(
+        "Aspect ratio",
+        choices=["9:16", "1:1", "16:9"],
+        default=current_config.default_aspect_ratio
+    )
+    settings["aspect_ratio"] = ratio
+    
+    # Caption style
+    console.print()
+    console.print("Default caption style:")
+    console.print("  default, bold, minimal, karaoke")
+    style = Prompt.ask(
+        "Caption style",
+        choices=["default", "bold", "minimal", "karaoke"],
+        default=current_config.default_caption_style
+    )
+    settings["caption_style"] = style
+    
+    # Max clips
+    console.print()
+    max_clips = Prompt.ask("Max clips per video", default=str(current_config.max_clips))
+    try:
+        settings["max_clips"] = int(max_clips)
+    except ValueError:
+        pass
+    
+    return settings
 
 
 def _save_setup_config(
     current_config: Config,
-    api_key: Optional[str],
-    ffmpeg_path: Optional[str]
+    groq_key: Optional[str],
+    openai_key: Optional[str],
+    gemini_key: Optional[str],
+    transcriber: Optional[TranscriberProvider],
+    analyzer: Optional[AnalyzerProvider],
+    ffmpeg_path: Optional[str],
+    ollama_host: Optional[str],
+    defaults: dict,
 ) -> bool:
-    """Save configuration from setup wizard.
-    
-    Args:
-        current_config: Current configuration
-        api_key: New API key (if provided)
-        ffmpeg_path: Custom FFmpeg path (if provided)
-        
-    Returns:
-        True if config was saved, False otherwise
-    """
+    """Save configuration from setup wizard."""
     logger = get_logger()
     console = logger.console
     
-    # Check if there's anything to save
-    if api_key is None and ffmpeg_path is None:
-        return False
-    
-    # Update config
+    # Build new config
     new_config = Config(
-        gemini_api_key=api_key if api_key else current_config.gemini_api_key,
-        default_model=current_config.default_model,
+        # API Keys
+        groq_api_key=groq_key if groq_key else current_config.groq_api_key,
+        openai_api_key=openai_key if openai_key else current_config.openai_api_key,
+        gemini_api_key=gemini_key if gemini_key else current_config.gemini_api_key,
+        # Providers
+        default_transcriber=transcriber if transcriber else current_config.default_transcriber,
+        default_analyzer=analyzer if analyzer else current_config.default_analyzer,
+        ollama_host=ollama_host if ollama_host else current_config.ollama_host,
+        # FFmpeg
         ffmpeg_path=ffmpeg_path if ffmpeg_path else current_config.ffmpeg_path,
-        default_output_dir=current_config.default_output_dir,
-        default_aspect_ratio=current_config.default_aspect_ratio,
-        default_caption_style=current_config.default_caption_style,
-        max_clips=current_config.max_clips,
+        # Defaults
+        default_language=defaults.get("language", current_config.default_language),
+        default_aspect_ratio=defaults.get("aspect_ratio", current_config.default_aspect_ratio),
+        default_caption_style=defaults.get("caption_style", current_config.default_caption_style),
+        max_clips=defaults.get("max_clips", current_config.max_clips),
         min_duration=current_config.min_duration,
         max_duration=current_config.max_duration,
+        default_output_dir=current_config.default_output_dir,
     )
     
     try:
@@ -473,19 +551,12 @@ def _save_setup_config(
         console.print(f"\n[green]✓[/green] Configuration saved to: {config_path}")
         return True
     except Exception as e:
-        console.print(f"\n[red]✗[/red] Failed to save configuration: {e}")
+        console.print(f"\n[red]✗[/red] Failed to save: {e}")
         return False
 
 
 def run_setup_wizard() -> int:
     """Run the interactive setup wizard.
-    
-    Guides users through:
-    1. Display current status
-    2. API key configuration
-    3. FFmpeg installation check/guidance
-    4. yt-dlp installation check/guidance
-    5. Saving configuration
     
     Returns:
         Exit code indicating success or failure
@@ -495,13 +566,12 @@ def run_setup_wizard() -> int:
     
     # Header
     console.print()
-    console.print("[bold cyan]╔══════════════════════════════════════════╗[/bold cyan]")
-    console.print("[bold cyan]║      SmartClip AI - Setup Wizard         ║[/bold cyan]")
-    console.print("[bold cyan]╚══════════════════════════════════════════╝[/bold cyan]")
+    console.print(Panel.fit(
+        "[bold cyan]SmartClip AI - Setup Wizard[/bold cyan]\n"
+        "[dim]Configure API keys, providers, and settings[/dim]",
+        border_style="cyan"
+    ))
     console.print()
-    
-    console.print("This wizard will help you configure SmartClip AI.")
-    console.print("You can skip any step by pressing Enter.")
     
     # Check and display current status
     status = _check_current_status()
@@ -510,63 +580,80 @@ def run_setup_wizard() -> int:
     # Load current config
     current_config = load_config()
     
-    # Track what was configured
-    new_api_key = None
-    new_ffmpeg_path = None
+    # Track changes
+    groq_key = None
+    openai_key = None
+    gemini_key = None
+    transcriber = None
+    analyzer = None
+    ffmpeg_path = None
+    ollama_host = None
+    defaults = {}
     
-    # Step 1: API Key
-    if Confirm.ask("Configure Gemini API key?", default=not status["api_key"]["configured"]):
-        new_api_key = _setup_api_key(current_config)
+    # Step 1: Groq API Key (default - FREE)
+    groq_key = _setup_groq_api_key(current_config)
     
-    # Step 2: FFmpeg
-    if Confirm.ask(
-        "Configure FFmpeg?",
-        default=not (status["ffmpeg"]["found"] and status["ffprobe"]["found"])
-    ):
-        new_ffmpeg_path = _setup_ffmpeg()
+    # Step 2: Other API Keys (optional)
+    if Confirm.ask("\nConfigure other API providers?", default=False):
+        openai_key = _setup_openai_api_key(current_config)
+        gemini_key = _setup_gemini_api_key(current_config)
     
-    # Step 3: yt-dlp (informational only)
+    # Step 3: Default providers
+    if Confirm.ask("\nConfigure default providers?", default=False):
+        transcriber, analyzer = _setup_default_providers(current_config)
+    
+    # Step 4: FFmpeg
+    if not status["ffmpeg"]["found"] or Confirm.ask("\nConfigure FFmpeg?", default=False):
+        ffmpeg_path = _setup_ffmpeg(current_config)
+    
+    # Step 5: yt-dlp (informational)
     if not status["ytdlp"]["found"]:
         _setup_ytdlp()
     
+    # Step 6: Local/Offline options
+    if Confirm.ask("\nConfigure local/offline options (Ollama, faster-whisper)?", default=False):
+        ollama_host, _ = _setup_local_options(current_config)
+    
+    # Step 7: Default settings
+    defaults = _setup_defaults(current_config)
+    
     # Save configuration
-    config_saved = _save_setup_config(current_config, new_api_key, new_ffmpeg_path)
+    _save_setup_config(
+        current_config,
+        groq_key, openai_key, gemini_key,
+        transcriber, analyzer,
+        ffmpeg_path, ollama_host,
+        defaults
+    )
     
     # Final summary
     console.print("\n[bold cyan]━━━ Setup Complete ━━━[/bold cyan]\n")
     
-    # Re-check status
     final_status = _check_current_status()
     
-    # Determine if ready to use
+    # Check if ready
     ready = (
         final_status["python"]["ok"] and
         final_status["ffmpeg"]["found"] and
-        final_status["ffprobe"]["found"] and
-        final_status["api_key"]["configured"]
+        final_status["groq_api_key"]["configured"]
     )
     
     if ready:
-        console.print("[green]✓[/green] SmartClip AI is ready to use!")
+        console.print("[green]✓ SmartClip AI is ready to use![/green]")
         console.print()
         console.print("Try it out:")
-        console.print("  sclip -i your_video.mp4")
-        console.print("  sclip -u 'https://youtube.com/watch?v=...'")
+        console.print("  [bold]sclip -i video.mp4[/bold]")
+        console.print("  [bold]sclip -u 'https://youtube.com/...'[/bold]")
     else:
-        console.print("[yellow]⚠[/yellow] Some components are still missing:")
-        
-        if not final_status["ffmpeg"]["found"] or not final_status["ffprobe"]["found"]:
+        console.print("[yellow]⚠ Some components are missing:[/yellow]")
+        if not final_status["ffmpeg"]["found"]:
             console.print("  • FFmpeg needs to be installed")
-        
-        if not final_status["api_key"]["configured"]:
-            console.print("  • Gemini API key needs to be configured")
-        
+        if not final_status["groq_api_key"]["configured"]:
+            console.print("  • Groq API key not configured (FREE at console.groq.com)")
         console.print()
-        console.print("Run 'sclip --check-deps' to verify your setup")
-        console.print("Run 'sclip --setup' again after installing missing components")
+        console.print("Run [bold]sclip --setup[/bold] again after fixing")
     
     console.print()
-    
     return ExitCode.SUCCESS
 
 

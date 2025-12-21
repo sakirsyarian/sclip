@@ -67,6 +67,23 @@ CaptionStyle = Literal["default", "bold", "minimal", "karaoke"]
 """
 
 
+# Type aliases for provider options
+TranscriberProvider = Literal["groq", "openai", "local"]
+"""Supported transcription providers.
+- "groq": Groq Whisper API (fast, free tier)
+- "openai": OpenAI Whisper API
+- "local": Local faster-whisper (offline)
+"""
+
+AnalyzerProvider = Literal["groq", "gemini", "openai", "ollama"]
+"""Supported analysis providers.
+- "groq": Groq LLMs (fast, free tier)
+- "gemini": Google Gemini
+- "openai": OpenAI GPT-4
+- "ollama": Local LLMs (offline)
+"""
+
+
 @dataclass
 class CLIOptions:
     """Options parsed from CLI arguments.
@@ -91,9 +108,17 @@ class CLIOptions:
         no_captions: If True, skip caption burn-in
         no_metadata: If True, skip metadata file generation
         keep_temp: If True, keep temporary files for debugging
-        api_key: Gemini API key (resolved from CLI > env > config)
-        model: Gemini model name to use
         ffmpeg_path: Custom path to FFmpeg executable
+        
+        # Provider options (new architecture)
+        transcriber: Transcription provider (groq, openai, local)
+        analyzer: Analysis provider (groq, gemini, openai, ollama)
+        groq_api_key: Groq API key
+        openai_api_key: OpenAI API key
+        gemini_api_key: Gemini API key
+        transcriber_model: Model for transcription
+        analyzer_model: Model for analysis
+        ollama_host: Ollama server host URL
     """
     url: str | None = None
     input: str | None = None
@@ -111,10 +136,22 @@ class CLIOptions:
     no_captions: bool = False
     no_metadata: bool = False
     keep_temp: bool = False
-    api_key: str | None = None
-    model: str = "gemini-2.0-flash"
     ffmpeg_path: str | None = None
-    audio_only: bool = False
+    
+    # Provider options (new architecture)
+    transcriber: TranscriberProvider = "groq"
+    analyzer: AnalyzerProvider = "groq"
+    groq_api_key: str | None = None
+    openai_api_key: str | None = None
+    gemini_api_key: str | None = None
+    transcriber_model: str | None = None
+    analyzer_model: str | None = None
+    ollama_host: str = "http://localhost:11434"
+    
+    # Legacy options (deprecated, kept for backward compatibility)
+    api_key: str | None = None  # Deprecated: use gemini_api_key
+    model: str = "gemini-2.0-flash"  # Deprecated: use analyzer_model
+    audio_only: bool = False  # Deprecated: new architecture always uses audio
 
 
 @dataclass
@@ -223,25 +260,60 @@ class Config:
     Values can be overridden by environment variables or CLI arguments.
     
     Attributes:
-        gemini_api_key: Stored Gemini API key (lowest priority)
-        default_model: Default Gemini model to use
+        # API Keys
+        groq_api_key: Groq API key (for transcription + analysis, default provider)
+        openai_api_key: OpenAI API key (for transcription + analysis)
+        gemini_api_key: Gemini API key (for analysis only)
+        
+        # Provider defaults
+        default_transcriber: Default transcription provider
+        default_analyzer: Default analysis provider
+        default_transcriber_model: Default model for transcription
+        default_analyzer_model: Default model for analysis
+        ollama_host: Ollama server URL for local LLM
+        
+        # FFmpeg
         ffmpeg_path: Custom FFmpeg path (if not in PATH)
+        
+        # Output defaults
         default_output_dir: Default output directory for clips
         default_aspect_ratio: Default aspect ratio for clips
         default_caption_style: Default caption style preset
+        default_language: Default language for transcription
+        
+        # Clip settings
         max_clips: Default maximum clips to generate
         min_duration: Default minimum clip duration
         max_duration: Default maximum clip duration
     """
+    # API Keys (Groq is default/recommended - free!)
+    groq_api_key: str | None = None
+    openai_api_key: str | None = None
     gemini_api_key: str | None = None
-    default_model: str = "gemini-2.0-flash"
+    
+    # Provider defaults
+    default_transcriber: TranscriberProvider = "groq"
+    default_analyzer: AnalyzerProvider = "groq"
+    default_transcriber_model: str | None = None
+    default_analyzer_model: str | None = None
+    ollama_host: str = "http://localhost:11434"
+    
+    # FFmpeg
     ffmpeg_path: str | None = None
+    
+    # Output defaults
     default_output_dir: str = "./output"
     default_aspect_ratio: AspectRatio = "9:16"
     default_caption_style: CaptionStyle = "default"
+    default_language: str = "id"  # Indonesian default
+    
+    # Clip settings
     max_clips: int = 5
     min_duration: int = 45
     max_duration: int = 180
+    
+    # Legacy (deprecated, kept for backward compatibility)
+    default_model: str = "gemini-2.0-flash"
 
 
 # Export all types
@@ -249,6 +321,8 @@ __all__ = [
     "ExitCode",
     "AspectRatio",
     "CaptionStyle",
+    "TranscriberProvider",
+    "AnalyzerProvider",
     "CLIOptions",
     "VideoInfo",
     "CaptionSegment",

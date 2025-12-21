@@ -6,8 +6,12 @@ from src.utils.config import (
     get_config_path,
     load_config,
     save_config,
-    get_api_key,
+    get_groq_api_key,
+    get_openai_api_key,
+    get_gemini_api_key,
+    get_ollama_host,
     get_ffmpeg_path,
+    get_api_key,  # Legacy
 )
 from src.utils.cleanup import (
     CleanupContext,
@@ -67,8 +71,12 @@ __all__ = [
     "get_config_path",
     "load_config",
     "save_config",
-    "get_api_key",
+    "get_groq_api_key",
+    "get_openai_api_key",
+    "get_gemini_api_key",
+    "get_ollama_host",
     "get_ffmpeg_path",
+    "get_api_key",  # Legacy
     # Cleanup
     "CleanupContext",
     "get_cleanup_context",

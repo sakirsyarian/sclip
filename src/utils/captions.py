@@ -82,43 +82,43 @@ CAPTION_STYLES: dict[CaptionStyle, CaptionStyleConfig] = {
         # Clean, readable style suitable for most content
         # Smaller font for word-by-word display
         "font": "Arial Bold",
-        "font_size": 36,
+        "font_size": 24,
         "color": "#FFFFFF",           # White text
         "stroke_color": "#000000",    # Black outline for readability
-        "stroke_width": 3,
+        "stroke_width": 2,
         "position": "bottom",
-        "margin_bottom": 180,         # Higher from bottom to not cover faces
+        "margin_bottom": 150,         # Higher from bottom to not cover faces
     },
     "bold": {
         # High-impact style for emphasis and viral content
         "font": "Impact",
-        "font_size": 42,
+        "font_size": 28,
         "color": "#FFFF00",           # Yellow text for attention
         "stroke_color": "#000000",
-        "stroke_width": 4,            # Thicker outline
+        "stroke_width": 3,            # Thicker outline
         "position": "bottom",
-        "margin_bottom": 180,
+        "margin_bottom": 150,
     },
     "minimal": {
         # Subtle style that doesn't distract from content
         "font": "Helvetica",
-        "font_size": 28,
+        "font_size": 20,
         "color": "#FFFFFF",
         "stroke_color": "#333333",    # Subtle dark gray outline
         "stroke_width": 1,
         "position": "bottom",
-        "margin_bottom": 120,
+        "margin_bottom": 100,
     },
     "karaoke": {
         # Word-by-word highlight effect (like karaoke)
         "font": "Arial Bold",
-        "font_size": 38,
+        "font_size": 26,
         "color": "#FFFFFF",
         "highlight_color": "#00FF00", # Green highlight for current word
         "stroke_color": "#000000",
-        "stroke_width": 3,
+        "stroke_width": 2,
         "position": "bottom",
-        "margin_bottom": 180,
+        "margin_bottom": 150,
         "word_highlight": True,       # Enable karaoke effect
     },
 }

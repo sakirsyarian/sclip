@@ -54,7 +54,7 @@ import click
 
 from src.types import CLIOptions, ExitCode, AspectRatio, CaptionStyle, TranscriberProvider, AnalyzerProvider
 from src.utils.cleanup import setup_cleanup_context, setup_signal_handlers
-from src.utils.config import get_api_key, get_ffmpeg_path, get_groq_api_key, get_openai_api_key, get_gemini_api_key, get_deepgram_api_key, get_deepseek_api_key, get_elevenlabs_api_key, get_mistral_api_key, load_config
+from src.utils.config import get_api_key, get_ffmpeg_path, get_groq_api_key, get_openai_api_key, get_gemini_api_key, get_deepgram_api_key, get_deepseek_api_key, get_elevenlabs_api_key, get_mistral_api_key, get_openai_base_url, get_default_transcriber_model, get_default_analyzer_model, load_config
 from src.utils.logger import setup_logger, get_logger
 
 
@@ -101,6 +101,12 @@ def version_callback(ctx: click.Context, param: click.Parameter, value: bool) ->
     help="Output directory for generated clips",
 )
 @click.option(
+    "--subtitle",
+    type=click.Path(exists=True),
+    default=None,
+    help="External subtitle file (.srt or .vtt) to skip transcription",
+)
+@click.option(
     "-n", "--max-clips",
     type=int,
     default=5,
@@ -110,7 +116,7 @@ def version_callback(ctx: click.Context, param: click.Parameter, value: bool) ->
 @click.option(
     "--min-duration",
     type=int,
-    default=45,
+    default=60,
     show_default=True,
     help="Minimum clip duration in seconds",
 )
@@ -207,14 +213,14 @@ def version_callback(ctx: click.Context, param: click.Parameter, value: bool) ->
 @click.option(
     "--transcriber",
     type=click.Choice(["groq", "openai", "deepgram", "elevenlabs", "local"]),
-    default="groq",
+    default="openai",
     show_default=True,
-    help="Transcription provider (groq=free Whisper API, openai=OpenAI Whisper, deepgram=Deepgram Nova, elevenlabs=ElevenLabs Scribe, local=faster-whisper)",
+    help="Transcription provider (openai=OpenAI Whisper, groq=free Whisper API, deepgram=Deepgram Nova, elevenlabs=ElevenLabs Scribe, local=faster-whisper)",
 )
 @click.option(
     "--analyzer",
     type=click.Choice(["groq", "deepseek", "gemini", "openai", "mistral", "ollama"]),
-    default="groq",
+    default="openai",
     show_default=True,
     help="Analysis provider for viral moment detection",
 )
@@ -287,6 +293,12 @@ def version_callback(ctx: click.Context, param: click.Parameter, value: bool) ->
     help="Ollama server host URL",
 )
 @click.option(
+    "--openai-base-url",
+    type=str,
+    default=None,
+    help="Custom base URL for OpenAI-compatible APIs (e.g., https://api.together.xyz, http://localhost:1234/v1)",
+)
+@click.option(
     "--info",
     "show_info",  # Rename to avoid confusion with info() method
     is_flag=True,
@@ -318,6 +330,7 @@ def main(
     url: Optional[str],
     input_file: Optional[str],
     output: str,
+    subtitle: Optional[str],
     max_clips: int,
     min_duration: int,
     max_duration: int,
@@ -346,6 +359,7 @@ def main(
     transcriber_model: Optional[str],
     analyzer_model: Optional[str],
     ollama_host: str,
+    openai_base_url: Optional[str],
     show_info: bool,
     check_deps: bool,
     run_setup: bool,
@@ -358,6 +372,7 @@ def main(
       sclip -u "https://youtu.be/xxxxx"       # Process YouTube video
       sclip -i video.mp4 --dry-run            # Preview without rendering
       sclip -i video.mp4 -n 3 -a 1:1          # 3 clips, square format
+      sclip -i video.mp4 --subtitle sub.srt   # Use external subtitle (skip transcription)
       sclip -i video.mp4 --analyzer gemini    # Use Gemini for analysis
       sclip -i video.mp4 --analyzer deepseek  # Use DeepSeek (very affordable)
       sclip -i video.mp4 --analyzer mistral   # Use Mistral (free tier)
@@ -366,6 +381,13 @@ def main(
       sclip -i video.mp4 --transcriber local --analyzer ollama  # Fully offline
       sclip --check-deps                      # Check dependencies
       sclip --setup                           # Run setup wizard
+    
+    \b
+    Custom OpenAI-Compatible Endpoints:
+      # Use any OpenAI-compatible API with --openai-base-url
+      sclip -i video.mp4 --analyzer openai --openai-base-url https://api.together.xyz/v1 --analyzer-model meta-llama/Llama-3-70b-chat-hf
+      sclip -i video.mp4 --analyzer openai --openai-base-url http://localhost:1234/v1 --analyzer-model local-model
+      sclip -i video.mp4 --analyzer openai --openai-base-url https://openrouter.ai/api/v1 --analyzer-model anthropic/claude-3-haiku
     
     \b
     Provider Options:
@@ -416,11 +438,15 @@ def main(
         resolved_deepseek_key = get_deepseek_api_key(deepseek_api_key)
         resolved_elevenlabs_key = get_elevenlabs_api_key(elevenlabs_api_key)
         resolved_mistral_key = get_mistral_api_key(mistral_api_key)
+        resolved_openai_base_url = get_openai_base_url(openai_base_url)
+        resolved_transcriber_model = get_default_transcriber_model(transcriber_model)
+        resolved_analyzer_model = get_default_analyzer_model(analyzer_model)
         
         options = CLIOptions(
             url=url,
             input=input_file,
             output=output,
+            subtitle=subtitle,
             max_clips=max_clips,
             min_duration=min_duration,
             max_duration=max_duration,
@@ -445,9 +471,10 @@ def main(
             deepseek_api_key=resolved_deepseek_key,
             elevenlabs_api_key=resolved_elevenlabs_key,
             mistral_api_key=resolved_mistral_key,
-            transcriber_model=transcriber_model,
-            analyzer_model=analyzer_model,
+            transcriber_model=resolved_transcriber_model,
+            analyzer_model=resolved_analyzer_model,
             ollama_host=ollama_host,
+            openai_base_url=resolved_openai_base_url,
             # Legacy (for backward compatibility)
             api_key=resolved_gemini_key,
             model=model,

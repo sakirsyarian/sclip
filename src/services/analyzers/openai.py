@@ -22,6 +22,7 @@ from .base import (
     AnalysisParseError,
     build_analysis_prompt,
     format_transcript_with_timestamps,
+    get_captions_for_range,
 )
 
 
@@ -32,11 +33,19 @@ class OpenAIAnalyzer(BaseAnalyzer):
     - High quality analysis
     - Large context windows
     - Paid service
+    - Supports custom base URL for OpenAI-compatible APIs
     
     Models:
     - gpt-4o: Best quality
     - gpt-4o-mini: Good balance of quality and cost
     - gpt-4-turbo: Previous generation
+    
+    Custom Base URL:
+    - Together AI: https://api.together.xyz/v1
+    - OpenRouter: https://openrouter.ai/api/v1
+    - Fireworks: https://api.fireworks.ai/inference/v1
+    - Local (LM Studio): http://localhost:1234/v1
+    - Local (vLLM): http://localhost:8000/v1
     """
     
     SUPPORTED_MODELS = [
@@ -46,9 +55,22 @@ class OpenAIAnalyzer(BaseAnalyzer):
         "gpt-3.5-turbo",
     ]
     
-    @property
-    def name(self) -> str:
-        return "OpenAI"
+    def __init__(
+        self, 
+        api_key: str | None = None, 
+        model: str | None = None,
+        base_url: str | None = None,
+        **kwargs
+    ):
+        """Initialize OpenAI analyzer.
+        
+        Args:
+            api_key: OpenAI API key (or compatible provider key)
+            model: Model name to use
+            base_url: Custom base URL for OpenAI-compatible APIs
+        """
+        super().__init__(api_key=api_key, model=model, **kwargs)
+        self.base_url = base_url
     
     @property
     def default_model(self) -> str:
@@ -56,7 +78,19 @@ class OpenAIAnalyzer(BaseAnalyzer):
     
     def is_available(self) -> bool:
         """Check if OpenAI API key is available."""
+        # For custom base URL, we still need an API key (could be from the provider)
         return bool(self.api_key or os.environ.get("OPENAI_API_KEY"))
+    
+    @property
+    def name(self) -> str:
+        """Return provider name, including custom endpoint info."""
+        if self.base_url:
+            # Extract domain for display
+            from urllib.parse import urlparse
+            parsed = urlparse(self.base_url)
+            domain = parsed.netloc or self.base_url
+            return f"OpenAI-compatible ({domain})"
+        return "OpenAI"
     
     def _get_api_key(self) -> str:
         """Get API key from instance or environment."""
@@ -104,7 +138,13 @@ class OpenAIAnalyzer(BaseAnalyzer):
             )
         
         api_key = self._get_api_key()
-        client = OpenAI(api_key=api_key)
+        
+        # Create client with optional custom base URL
+        client_kwargs = {"api_key": api_key}
+        if self.base_url:
+            client_kwargs["base_url"] = self.base_url
+        
+        client = OpenAI(**client_kwargs)
         
         model = self.get_model()
         update_progress(f"Analyzing with {model}...")
@@ -151,25 +191,62 @@ class OpenAIAnalyzer(BaseAnalyzer):
         )
     
     def _do_analyze(self, client, model: str, prompt: str) -> str:
-        """Perform the actual analysis (synchronous)."""
+        """Perform the actual analysis (synchronous).
+        
+        Tries with JSON mode first, falls back to regular mode if not supported.
+        """
+        # Try with JSON mode first (OpenAI native models support this)
+        try:
+            response = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are an expert video editor who identifies viral-worthy moments. Always respond with valid JSON only."
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                temperature=0.3,
+                max_tokens=4096,
+                response_format={"type": "json_object"}
+            )
+            
+            content = response.choices[0].message.content
+            if content:
+                return content
+        except Exception as e:
+            error_str = str(e).lower()
+            # If JSON mode not supported, try without it
+            if "json" in error_str or "response_format" in error_str or "not supported" in error_str:
+                pass  # Fall through to try without JSON mode
+            else:
+                raise  # Re-raise other errors
+        
+        # Fallback: Try without response_format (for models that don't support it)
         response = client.chat.completions.create(
             model=model,
             messages=[
                 {
                     "role": "system",
-                    "content": "You are an expert video editor who identifies viral-worthy moments. Always respond with valid JSON only."
+                    "content": "You are an expert video editor who identifies viral-worthy moments. You MUST respond with valid JSON only. No markdown, no explanation, just pure JSON."
                 },
                 {
                     "role": "user",
-                    "content": prompt
+                    "content": prompt + "\n\nIMPORTANT: Respond with valid JSON only. No markdown code blocks, no explanation."
                 }
             ],
             temperature=0.3,
             max_tokens=4096,
-            response_format={"type": "json_object"}
         )
         
-        return response.choices[0].message.content
+        content = response.choices[0].message.content
+        if not content:
+            raise AnalysisAPIError(f"Model {model} returned empty response. Check if the model is available and supports chat completions.")
+        
+        return content
     
     def _parse_response(
         self, 
@@ -177,11 +254,42 @@ class OpenAIAnalyzer(BaseAnalyzer):
         transcription: TranscriptionResult
     ) -> list[ClipData]:
         """Parse LLM response into ClipData list."""
+        if not response_text or not response_text.strip():
+            raise AnalysisParseError("Empty response from model. The model may not support this task or returned no content.")
+        
+        # Clean up response
+        text = response_text.strip()
+        
+        # Handle thinking models (like MiniMax-M2.1, DeepSeek R1) that output <think>...</think>
+        import re
+        
+        # Remove <think>...</think> blocks (thinking/reasoning content)
+        text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
+        text = text.strip()
+        
+        # Remove markdown code blocks if present
+        if text.startswith("```"):
+            lines = text.split("\n")
+            if lines[0].startswith("```"):
+                lines = lines[1:]
+            if lines and lines[-1].strip() == "```":
+                lines = lines[:-1]
+            text = "\n".join(lines)
+        
+        # Try to find JSON object in the response
+        # Some models output text before/after JSON
+        json_match = re.search(r'\{[\s\S]*\}', text)
+        if json_match:
+            text = json_match.group(0)
+        
+        if not text.strip():
+            raise AnalysisParseError("No JSON content found in response. Model may still be 'thinking' or returned only reasoning.")
+        
         try:
-            data = json.loads(response_text)
+            data = json.loads(text)
             
             if "clips" not in data:
-                raise AnalysisParseError("Response missing 'clips' field")
+                raise AnalysisParseError(f"Response missing 'clips' field. Got keys: {list(data.keys())}")
             
             clips: list[ClipData] = []
             for clip_data in data["clips"]:
@@ -191,7 +299,8 @@ class OpenAIAnalyzer(BaseAnalyzer):
                 if end_time <= start_time:
                     continue
                 
-                captions = self._get_captions_for_range(
+                # Use shared helper function for caption extraction
+                captions = get_captions_for_range(
                     transcription, start_time, end_time
                 )
                 
@@ -206,29 +315,6 @@ class OpenAIAnalyzer(BaseAnalyzer):
             return clips
             
         except json.JSONDecodeError as e:
-            raise AnalysisParseError(f"Invalid JSON response: {e}")
-    
-    def _get_captions_for_range(
-        self,
-        transcription: TranscriptionResult,
-        start_time: float,
-        end_time: float
-    ) -> list[CaptionSegment]:
-        """Extract captions for a specific time range."""
-        captions: list[CaptionSegment] = []
-        
-        for word in transcription.words:
-            # Include words that overlap with the time range
-            # A word overlaps if it starts before end_time AND ends after start_time
-            if word.start < end_time and word.end > start_time:
-                # Clamp word times to clip boundaries
-                word_start = max(word.start, start_time)
-                word_end = min(word.end, end_time)
-                
-                captions.append(CaptionSegment(
-                    start=word_start - start_time,
-                    end=word_end - start_time,
-                    text=word.word
-                ))
-        
-        return captions
+            # Show first 200 chars of response for debugging
+            preview = text[:200] + "..." if len(text) > 200 else text
+            raise AnalysisParseError(f"Invalid JSON response: {e}\nResponse preview: {preview}")

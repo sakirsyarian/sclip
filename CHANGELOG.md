@@ -5,6 +5,81 @@ All notable changes to SmartClip AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.5] - 2024-12-23
+
+### Added
+- **Custom OpenAI-Compatible Base URL** (`--openai-base-url`)
+  - Use any OpenAI-compatible API endpoint (Together AI, OpenRouter, Fireworks, LM Studio, vLLM, etc.)
+  - Combine with `--analyzer openai` and `--analyzer-model` for full flexibility
+  - Supports local LLM servers with OpenAI-compatible API
+  - CLI option: `--openai-base-url <URL>`
+  - Saved to config via `sclip --setup`
+
+### Changed
+- **Default provider changed from Groq to OpenAI** for both transcription and analysis
+- **Default min_duration changed from 45 to 60 seconds**
+- OpenAI analyzer now shows custom endpoint domain in provider name
+- Improved error messages for custom endpoint authentication
+- Setup wizard now includes all settings:
+  - API keys (OpenAI, Groq, Gemini, etc.)
+  - Custom OpenAI base URL
+  - Default transcriber & analyzer
+  - **Default transcriber model** (new)
+  - **Default analyzer model** (new)
+  - Min/max duration
+  - Output directory
+  - Language, aspect ratio, caption style
+
+### Usage Examples
+```bash
+# Default (OpenAI for both)
+sclip -i video.mp4
+
+# Free alternative with Groq
+sclip -i video.mp4 --transcriber groq --analyzer groq
+
+# Together AI
+sclip -i video.mp4 --analyzer openai --openai-base-url https://api.together.xyz/v1 \
+  --openai-api-key $TOGETHER_API_KEY --analyzer-model meta-llama/Llama-3-70b-chat-hf
+
+# OpenRouter
+sclip -i video.mp4 --analyzer openai --openai-base-url https://openrouter.ai/api/v1 \
+  --openai-api-key $OPENROUTER_API_KEY --analyzer-model anthropic/claude-3-haiku
+
+# Local LM Studio
+sclip -i video.mp4 --analyzer openai --openai-base-url http://localhost:1234/v1 \
+  --openai-api-key lm-studio --analyzer-model local-model
+```
+
+## [0.2.4] - 2024-12-23
+
+### Added
+- **External Subtitle Support** (`--subtitle`)
+  - Upload external subtitle file (.srt or .vtt) to skip transcription
+  - Faster processing (skip 2-5 min transcription step)
+  - No transcription API cost when using external subtitles
+  - More accurate captions from professional subtitles
+  - Supports both SRT (SubRip) and VTT (WebVTT) formats
+  - Word timestamps estimated from segment timing
+  - CLI option: `--subtitle path/to/subtitle.srt`
+
+### Changed
+- Transcription step is now optional when subtitle file is provided
+- API key validation skips transcriber check when using external subtitle
+- Dry-run mode shows subtitle source info when using external file
+
+### Usage Examples
+```bash
+# Use external SRT subtitle (skip transcription)
+sclip -i video.mp4 --subtitle subtitle.srt
+
+# Use VTT subtitle with Gemini analyzer
+sclip -i video.mp4 --subtitle captions.vtt --analyzer gemini
+
+# Combine with other options
+sclip -i podcast.mp4 --subtitle podcast.srt -n 5 -a 9:16 -s bold
+```
+
 ## [0.2.3] - 2024-12-21
 
 ### Added

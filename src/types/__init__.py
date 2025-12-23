@@ -99,6 +99,7 @@ class CLIOptions:
         url: YouTube URL to download and process (mutually exclusive with input)
         input: Path to local video file (mutually exclusive with url)
         output: Output directory for generated clips
+        subtitle: Path to external subtitle file (.srt or .vtt) to skip transcription
         max_clips: Maximum number of clips to generate (1-10 recommended)
         min_duration: Minimum clip duration in seconds
         max_duration: Maximum clip duration in seconds
@@ -127,8 +128,9 @@ class CLIOptions:
     url: str | None = None
     input: str | None = None
     output: str = "./output"
+    subtitle: str | None = None  # External subtitle file path
     max_clips: int = 5
-    min_duration: int = 45
+    min_duration: int = 60
     max_duration: int = 180
     aspect_ratio: AspectRatio = "9:16"
     caption_style: CaptionStyle = "default"
@@ -143,8 +145,8 @@ class CLIOptions:
     ffmpeg_path: str | None = None
     
     # Provider options (new architecture)
-    transcriber: TranscriberProvider = "groq"
-    analyzer: AnalyzerProvider = "groq"
+    transcriber: TranscriberProvider = "openai"
+    analyzer: AnalyzerProvider = "openai"
     groq_api_key: str | None = None
     openai_api_key: str | None = None
     gemini_api_key: str | None = None
@@ -155,6 +157,9 @@ class CLIOptions:
     transcriber_model: str | None = None
     analyzer_model: str | None = None
     ollama_host: str = "http://localhost:11434"
+    
+    # Custom OpenAI-compatible endpoint
+    openai_base_url: str | None = None  # Custom base URL for OpenAI-compatible APIs
     
     # Legacy options (deprecated, kept for backward compatibility)
     api_key: str | None = None  # Deprecated: use gemini_api_key
@@ -279,6 +284,7 @@ class Config:
         default_transcriber_model: Default model for transcription
         default_analyzer_model: Default model for analysis
         ollama_host: Ollama server URL for local LLM
+        openai_base_url: Custom base URL for OpenAI-compatible APIs
         
         # FFmpeg
         ffmpeg_path: Custom FFmpeg path (if not in PATH)
@@ -304,11 +310,12 @@ class Config:
     mistral_api_key: str | None = None
     
     # Provider defaults
-    default_transcriber: TranscriberProvider = "groq"
-    default_analyzer: AnalyzerProvider = "groq"
+    default_transcriber: TranscriberProvider = "openai"
+    default_analyzer: AnalyzerProvider = "openai"
     default_transcriber_model: str | None = None
     default_analyzer_model: str | None = None
     ollama_host: str = "http://localhost:11434"
+    openai_base_url: str | None = None  # Custom base URL for OpenAI-compatible APIs
     
     # FFmpeg
     ffmpeg_path: str | None = None
@@ -321,7 +328,7 @@ class Config:
     
     # Clip settings
     max_clips: int = 5
-    min_duration: int = 45
+    min_duration: int = 60
     max_duration: int = 180
     
     # Legacy (deprecated, kept for backward compatibility)

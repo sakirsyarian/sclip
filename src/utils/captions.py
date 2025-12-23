@@ -304,27 +304,32 @@ def _generate_standard_events(
     captions: list[CaptionSegment],
     clip_start_time: float
 ) -> str:
-    """Generate standard ASS dialogue events with limited words per line.
+    """Generate standard ASS dialogue events.
+    
+    For segment-based captions (from external SRT/VTT), we display
+    the full segment text without splitting to preserve accurate timing.
+    
+    Note: Caption times are already relative to clip start (adjusted in 
+    get_captions_for_range), so clip_start_time parameter is kept for
+    backward compatibility but not used for offset calculation.
     
     Args:
-        captions: List of caption segments
-        clip_start_time: Start time offset for the clip
+        captions: List of caption segments (times already relative to clip)
+        clip_start_time: Start time offset (not used - times already adjusted)
         
     Returns:
         ASS dialogue events as string
     """
     events = []
     
-    # Process captions - split long text into smaller chunks (max 2 words)
-    processed_captions = _split_long_captions(captions, max_words=2)
-    
-    for caption in processed_captions:
-        # Adjust times relative to clip start
-        start = caption["start"] - clip_start_time
-        end = caption["end"] - clip_start_time
+    for caption in captions:
+        # Caption times are already relative to clip start
+        # (adjusted in get_captions_for_range in base.py)
+        start = caption["start"]
+        end = caption["end"]
         text = caption["text"]
         
-        # Skip captions with negative times (before clip start)
+        # Skip captions with negative times
         if end <= 0:
             continue
         
@@ -403,12 +408,16 @@ def _generate_karaoke_events(
 ) -> str:
     """Generate karaoke-style ASS dialogue events with word highlighting.
     
-    In karaoke mode, each word is highlighted as it's spoken using
+    In karaoke mode, each word/segment is highlighted as it's spoken using
     ASS karaoke timing tags.
     
+    Note: Caption times are already relative to clip start (adjusted in 
+    get_captions_for_range), so clip_start_time parameter is kept for
+    backward compatibility but not used for offset calculation.
+    
     Args:
-        captions: List of caption segments (ideally word-level)
-        clip_start_time: Start time offset for the clip
+        captions: List of caption segments (times already relative to clip)
+        clip_start_time: Start time offset (not used - times already adjusted)
         
     Returns:
         ASS dialogue events with karaoke effects as string
@@ -422,11 +431,11 @@ def _generate_karaoke_events(
         if not line_captions:
             continue
             
-        # Get line timing
-        line_start = line_captions[0]["start"] - clip_start_time
-        line_end = line_captions[-1]["end"] - clip_start_time
+        # Get line timing (times are already relative to clip)
+        line_start = line_captions[0]["start"]
+        line_end = line_captions[-1]["end"]
         
-        # Skip lines before clip start
+        # Skip lines with invalid times
         if line_end <= 0:
             continue
         
@@ -435,8 +444,8 @@ def _generate_karaoke_events(
         # Build karaoke text with timing tags
         karaoke_text = ""
         for i, caption in enumerate(line_captions):
-            word_start = caption["start"] - clip_start_time
-            word_end = caption["end"] - clip_start_time
+            word_start = caption["start"]
+            word_end = caption["end"]
             word = _escape_ass_text(caption["text"])
             
             # Calculate duration in centiseconds for karaoke tag

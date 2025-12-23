@@ -113,19 +113,29 @@ async def _execute_clip_async(options: CLIOptions) -> int:
             logger.error(api_error)
             return ExitCode.API_ERROR
         
-        # Step 5: Extract audio from video
-        logger.info("Extracting audio...")
-        audio_path = await _extract_audio(video_path, options.ffmpeg_path, cleanup_ctx)
-        if audio_path is None:
-            return ExitCode.PROCESSING_ERROR
-        logger.success("Audio extracted")
-        
-        # Step 6: Transcribe audio
-        logger.info(f"Transcribing with {options.transcriber}...")
-        transcription = await _transcribe_audio(audio_path, options)
-        if transcription is None:
-            return ExitCode.API_ERROR
-        logger.success(f"Transcription complete ({len(transcription.words)} words)")
+        # Step 5: Handle subtitle - either from external file or extract audio + transcribe
+        if options.subtitle:
+            # Use external subtitle file (skip transcription)
+            logger.info(f"Using external subtitle: {os.path.basename(options.subtitle)}")
+            transcription = _parse_external_subtitle(options.subtitle)
+            if transcription is None:
+                return ExitCode.INPUT_ERROR
+            logger.success(f"Subtitle loaded ({len(transcription.words)} segments)")
+            audio_path = None  # No audio extraction needed
+        else:
+            # Step 5a: Extract audio from video
+            logger.info("Extracting audio...")
+            audio_path = await _extract_audio(video_path, options.ffmpeg_path, cleanup_ctx)
+            if audio_path is None:
+                return ExitCode.PROCESSING_ERROR
+            logger.success("Audio extracted")
+            
+            # Step 5b: Transcribe audio
+            logger.info(f"Transcribing with {options.transcriber}...")
+            transcription = await _transcribe_audio(audio_path, options)
+            if transcription is None:
+                return ExitCode.API_ERROR
+            logger.success(f"Transcription complete ({len(transcription.words)} words)")
         
         # Step 7: Analyze transcript for viral moments
         logger.info(f"Analyzing with {options.analyzer}...")
@@ -191,18 +201,20 @@ def _validate_provider_keys(options: CLIOptions) -> str | None:
     Returns:
         Error message if validation fails, None if OK
     """
-    # Check transcriber API key
-    if options.transcriber == "groq" and not options.groq_api_key:
-        return "Groq API key required for transcription. Set GROQ_API_KEY or use --groq-api-key"
-    
-    if options.transcriber == "openai" and not options.openai_api_key:
-        return "OpenAI API key required for transcription. Set OPENAI_API_KEY or use --openai-api-key"
-    
-    if options.transcriber == "deepgram" and not options.deepgram_api_key:
-        return "Deepgram API key required for transcription. Set DEEPGRAM_API_KEY or use --deepgram-api-key. Get $200 free credit at https://deepgram.com"
-    
-    if options.transcriber == "elevenlabs" and not options.elevenlabs_api_key:
-        return "ElevenLabs API key required for transcription. Set ELEVENLABS_API_KEY or use --elevenlabs-api-key. Get API key at https://elevenlabs.io"
+    # Skip transcriber validation if using external subtitle
+    if not options.subtitle:
+        # Check transcriber API key
+        if options.transcriber == "groq" and not options.groq_api_key:
+            return "Groq API key required for transcription. Set GROQ_API_KEY or use --groq-api-key"
+        
+        if options.transcriber == "openai" and not options.openai_api_key:
+            return "OpenAI API key required for transcription. Set OPENAI_API_KEY or use --openai-api-key"
+        
+        if options.transcriber == "deepgram" and not options.deepgram_api_key:
+            return "Deepgram API key required for transcription. Set DEEPGRAM_API_KEY or use --deepgram-api-key. Get $200 free credit at https://deepgram.com"
+        
+        if options.transcriber == "elevenlabs" and not options.elevenlabs_api_key:
+            return "ElevenLabs API key required for transcription. Set ELEVENLABS_API_KEY or use --elevenlabs-api-key. Get API key at https://elevenlabs.io"
     
     # Check analyzer API key
     if options.analyzer == "groq" and not options.groq_api_key:
@@ -212,6 +224,9 @@ def _validate_provider_keys(options: CLIOptions) -> str | None:
         return "Gemini API key required for analysis. Set GEMINI_API_KEY or use --gemini-api-key"
     
     if options.analyzer == "openai" and not options.openai_api_key:
+        # Custom base URL might use different auth, but still needs a key
+        if options.openai_base_url:
+            return "API key required for OpenAI-compatible endpoint. Set OPENAI_API_KEY or use --openai-api-key with your provider's key"
         return "OpenAI API key required for analysis. Set OPENAI_API_KEY or use --openai-api-key"
     
     if options.analyzer == "deepseek" and not options.deepseek_api_key:
@@ -224,6 +239,64 @@ def _validate_provider_keys(options: CLIOptions) -> str | None:
     # ollama and local transcriber work without keys
     
     return None
+
+
+def _parse_external_subtitle(subtitle_path: str):
+    """Parse external subtitle file and convert to transcription format.
+    
+    Uses segment-based approach for accurate timing (not word-by-word estimation).
+    
+    Args:
+        subtitle_path: Path to .srt or .vtt file
+        
+    Returns:
+        Object compatible with TranscriptionResult, or None on error
+    """
+    logger = get_logger()
+    
+    try:
+        from src.utils.srt_parser import parse_subtitle_file, SubtitleParseError
+        
+        def on_progress(msg: str) -> None:
+            logger.debug(msg)
+        
+        result = parse_subtitle_file(subtitle_path, progress_callback=on_progress)
+        
+        # Create a transcription-compatible object
+        # Uses segment-based approach: each "word" is actually a full segment
+        class SubtitleTranscription:
+            def __init__(self, text, words, duration, is_segment_based):
+                self.text = text
+                self.words = words
+                self.duration = duration
+                self.is_segment_based = is_segment_based  # Flag for analyzers
+        
+        # Convert to format expected by analyzers
+        class WordInfo:
+            def __init__(self, word, start, end):
+                self.word = word
+                self.start = start
+                self.end = end
+        
+        # Each segment becomes one "word" entry with accurate timing
+        words = [WordInfo(w.word, w.start, w.end) for w in result.words]
+        
+        return SubtitleTranscription(
+            result.text, 
+            words, 
+            result.duration,
+            is_segment_based=True
+        )
+        
+    except SubtitleParseError as e:
+        logger.error(f"Failed to parse subtitle: {e}")
+        return None
+    except FileNotFoundError as e:
+        logger.error(f"Subtitle file not found: {e}")
+        return None
+    except Exception as e:
+        logger.error(f"Error reading subtitle: {e}")
+        return None
 
 
 async def _download_video(url: str, cleanup_ctx) -> str | None:
@@ -386,6 +459,9 @@ async def _analyze_transcript(
             api_key = options.gemini_api_key
         elif options.analyzer == "openai":
             api_key = options.openai_api_key
+            # Pass custom base URL if provided
+            if options.openai_base_url:
+                extra_kwargs["base_url"] = options.openai_base_url
         elif options.analyzer == "deepseek":
             api_key = options.deepseek_api_key
         elif options.analyzer == "mistral":
@@ -488,11 +564,20 @@ def _display_dry_run_results(
     logger = get_logger()
     
     logger.newline()
+    
+    # Show subtitle source info
+    if options.subtitle:
+        source_info = f"Subtitle: {os.path.basename(options.subtitle)} (external)"
+        transcriber_info = "Transcriber: skipped (using external subtitle)"
+    else:
+        source_info = f"Source: {os.path.basename(video_info.path)}"
+        transcriber_info = f"Transcriber: {options.transcriber}"
+    
     logger.box("DRY RUN MODE", [
         "Analysis complete - no clips will be rendered",
-        f"Source: {os.path.basename(video_info.path)}",
+        source_info,
         f"Duration: {format_duration(video_info.duration)} | Resolution: {format_resolution(video_info.width, video_info.height)}",
-        f"Transcriber: {options.transcriber} | Analyzer: {options.analyzer}",
+        f"{transcriber_info} | Analyzer: {options.analyzer}",
     ])
     logger.newline()
     

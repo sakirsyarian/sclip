@@ -22,6 +22,7 @@ from .base import (
     AnalysisParseError,
     build_analysis_prompt,
     format_transcript_with_timestamps,
+    get_captions_for_range,
 )
 
 
@@ -210,8 +211,8 @@ class MistralAnalyzer(BaseAnalyzer):
                 if end_time <= start_time:
                     continue
                 
-                # Get captions from transcription for this time range
-                captions = self._get_captions_for_range(
+                # Use shared helper function for caption extraction
+                captions = get_captions_for_range(
                     transcription, start_time, end_time
                 )
                 
@@ -249,28 +250,3 @@ class MistralAnalyzer(BaseAnalyzer):
                 i += 1
         
         return ''.join(result)
-    
-    def _get_captions_for_range(
-        self,
-        transcription: TranscriptionResult,
-        start_time: float,
-        end_time: float
-    ) -> list[CaptionSegment]:
-        """Extract captions for a specific time range."""
-        captions: list[CaptionSegment] = []
-        
-        for word in transcription.words:
-            # Include words that overlap with the time range
-            # A word overlaps if it starts before end_time AND ends after start_time
-            if word.start < end_time and word.end > start_time:
-                # Clamp word times to clip boundaries
-                word_start = max(word.start, start_time)
-                word_end = min(word.end, end_time)
-                
-                captions.append(CaptionSegment(
-                    start=word_start - start_time,
-                    end=word_end - start_time,
-                    text=word.word
-                ))
-        
-        return captions

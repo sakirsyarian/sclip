@@ -120,6 +120,8 @@ def build_analysis_prompt(
 def format_transcript_with_timestamps(transcription: TranscriptionResult) -> str:
     """Format transcription with timestamps for analysis.
     
+    Handles both word-by-word (API transcription) and segment-based (external subtitle).
+    
     Args:
         transcription: TranscriptionResult with word timestamps
         
@@ -129,6 +131,18 @@ def format_transcript_with_timestamps(transcription: TranscriptionResult) -> str
     if not transcription.words:
         return transcription.text
     
+    # Check if this is segment-based (from external subtitle)
+    is_segment_based = getattr(transcription, 'is_segment_based', False)
+    
+    if is_segment_based:
+        # For segment-based: each "word" is already a full segment
+        lines = []
+        for segment in transcription.words:
+            timestamp = f"[{segment.start:.2f}s - {segment.end:.2f}s]"
+            lines.append(f"{timestamp} {segment.word}")
+        return "\n".join(lines)
+    
+    # For word-by-word: group into lines
     lines = []
     current_line = []
     current_start = None
@@ -153,6 +167,45 @@ def format_transcript_with_timestamps(transcription: TranscriptionResult) -> str
         lines.append(f"{timestamp} {' '.join(current_line)}")
     
     return "\n".join(lines)
+
+
+def get_captions_for_range(
+    transcription: TranscriptionResult,
+    start_time: float,
+    end_time: float
+) -> list:
+    """Extract captions for a specific time range.
+    
+    Handles both word-by-word and segment-based transcriptions.
+    For segment-based (external subtitle): returns full segments as captions.
+    For word-by-word (API transcription): returns individual words as captions.
+    
+    Args:
+        transcription: TranscriptionResult with words/segments
+        start_time: Clip start time in seconds
+        end_time: Clip end time in seconds
+        
+    Returns:
+        List of CaptionSegment dicts
+    """
+    from src.types import CaptionSegment
+    
+    captions: list[CaptionSegment] = []
+    
+    for word in transcription.words:
+        # Include items that overlap with the time range
+        if word.start < end_time and word.end > start_time:
+            # Clamp times to clip boundaries
+            caption_start = max(word.start, start_time)
+            caption_end = min(word.end, end_time)
+            
+            captions.append(CaptionSegment(
+                start=caption_start - start_time,  # Relative to clip start
+                end=caption_end - start_time,
+                text=word.word
+            ))
+    
+    return captions
 
 
 class BaseAnalyzer(ABC):

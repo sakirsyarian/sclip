@@ -109,6 +109,7 @@ def _config_to_dict(config: Config) -> dict[str, Any]:
         "default_transcriber_model": config.default_transcriber_model,
         "default_analyzer_model": config.default_analyzer_model,
         "ollama_host": config.ollama_host,
+        "openai_base_url": config.openai_base_url,
         # FFmpeg
         "ffmpeg_path": config.ffmpeg_path,
         # Output defaults
@@ -155,6 +156,7 @@ def _dict_to_config(data: dict[str, Any]) -> Config:
         default_transcriber_model=data.get("default_transcriber_model", defaults.default_transcriber_model),
         default_analyzer_model=data.get("default_analyzer_model", defaults.default_analyzer_model),
         ollama_host=data.get("ollama_host", defaults.ollama_host),
+        openai_base_url=data.get("openai_base_url", defaults.openai_base_url),
         # FFmpeg
         ffmpeg_path=data.get("ffmpeg_path", defaults.ffmpeg_path),
         # Output defaults
@@ -349,6 +351,36 @@ def get_ollama_host(cli_host: str | None = None) -> str:
     return config.ollama_host
 
 
+def get_openai_base_url(cli_url: str | None = None) -> str | None:
+    """Get OpenAI base URL with priority: CLI > environment > config.
+    
+    Used for OpenAI-compatible APIs like Together AI, OpenRouter, LM Studio, etc.
+    """
+    if cli_url:
+        return cli_url
+    env_url = os.environ.get("OPENAI_BASE_URL")
+    if env_url:
+        return env_url
+    config = load_config()
+    return config.openai_base_url
+
+
+def get_default_transcriber_model(cli_model: str | None = None) -> str | None:
+    """Get default transcriber model with priority: CLI > config."""
+    if cli_model:
+        return cli_model
+    config = load_config()
+    return config.default_transcriber_model
+
+
+def get_default_analyzer_model(cli_model: str | None = None) -> str | None:
+    """Get default analyzer model with priority: CLI > config."""
+    if cli_model:
+        return cli_model
+    config = load_config()
+    return config.default_analyzer_model
+
+
 def get_ffmpeg_path(cli_path: str | None = None) -> str | None:
     """Get FFmpeg path with priority: CLI > environment > config."""
     if cli_path:
@@ -379,6 +411,9 @@ __all__ = [
     "get_elevenlabs_api_key",
     "get_mistral_api_key",
     "get_ollama_host",
+    "get_openai_base_url",
+    "get_default_transcriber_model",
+    "get_default_analyzer_model",
     "get_ffmpeg_path",
     "get_api_key",  # Legacy
     "CONFIG_FILENAME",

@@ -212,38 +212,34 @@ SmartClip AI mendukung beberapa provider. **Groq adalah default dan GRATIS!**
 
 | Provider | Transcription | Analysis | Biaya |
 |----------|--------------|----------|-------|
-| **Groq** (Default) | ✅ Whisper | ✅ Llama 3.3 | **GRATIS** |
+| **OpenAI** (Default) | ✅ Whisper | ✅ GPT-4 | Berbayar |
+| Groq | ✅ Whisper | ✅ Llama 3.3 | **GRATIS** |
 | Deepgram | ✅ Nova | ❌ | $200 free credit |
 | ElevenLabs | ✅ Scribe | ❌ | Berbayar |
 | DeepSeek | ❌ | ✅ DeepSeek-V3 | Sangat murah |
 | Mistral | ❌ | ✅ Mistral | Free tier |
-| OpenAI | ✅ Whisper | ✅ GPT-4 | Berbayar |
 | Gemini | ❌ | ✅ Gemini | Free tier |
 | Ollama | ❌ | ✅ Local LLM | **GRATIS** (offline) |
 | Local | ✅ faster-whisper | ❌ | **GRATIS** (offline) |
 
-### Step 1: Dapatkan Groq API Key (GRATIS - Recommended)
+### Step 1: Dapatkan OpenAI API Key (Default)
 
 1. Buka browser
-2. Pergi ke: https://console.groq.com/
-3. Login dengan akun Google atau GitHub
-4. Klik **"API Keys"** di sidebar
-5. Klik **"Create API Key"**
-6. Copy API key yang muncul
+2. Pergi ke: https://platform.openai.com/api-keys
+3. Login atau buat akun
+4. Klik **"Create new secret key"**
+5. Copy API key yang muncul
 
 > ⚠️ **PENTING**: Simpan API key ini dengan aman! Jangan share ke siapapun.
 
-### Step 2 (Optional): Dapatkan API Key Lainnya
+### Step 2 (Optional): Dapatkan API Key Gratis (Groq)
 
-**Gemini API Key** (untuk analyzer alternatif):
-1. Buka https://aistudio.google.com/
-2. Login dengan akun Google
-3. Klik **"Get API Key"**
-4. Copy API key
-
-**OpenAI API Key** (berbayar):
-1. Buka https://platform.openai.com/api-keys
-2. Login dan buat API key
+Jika ingin alternatif gratis:
+1. Buka https://console.groq.com/
+2. Login dengan akun Google atau GitHub
+3. Klik **"API Keys"** di sidebar
+4. Klik **"Create API Key"**
+5. Copy API key yang muncul
 
 ### Step 3: Setup API Key
 
@@ -251,22 +247,22 @@ SmartClip AI mendukung beberapa provider. **Groq adalah default dan GRATIS!**
 
 **Windows (Command Prompt):**
 ```cmd
-set GROQ_API_KEY=your-groq-api-key-here
+set OPENAI_API_KEY=your-openai-api-key-here
 ```
 
 **Windows (PowerShell):**
 ```powershell
-$env:GROQ_API_KEY="your-groq-api-key-here"
+$env:OPENAI_API_KEY="your-openai-api-key-here"
 ```
 
 **macOS/Linux:**
 ```bash
-export GROQ_API_KEY="your-groq-api-key-here"
+export OPENAI_API_KEY="your-openai-api-key-here"
 ```
 
 **Cara 2: Via CLI Flag**
 ```cmd
-sclip -i video.mp4 --groq-api-key "your-api-key-here"
+sclip -i video.mp4 --openai-api-key "your-api-key-here"
 ```
 
 **Cara 3: Setup Wizard**
@@ -453,6 +449,16 @@ sclip --check-deps
 sclip --setup
 ```
 
+Setup wizard memungkinkan kamu mengkonfigurasi:
+- API Keys (OpenAI, Groq, Gemini, dll)
+- Custom OpenAI Base URL (untuk Together AI, OpenRouter, dll)
+- Default Transcriber & Analyzer
+- Default Transcriber Model (e.g., whisper-1, whisper-large-v3-turbo)
+- Default Analyzer Model (e.g., gpt-4o, gpt-4o-mini)
+- Language, Aspect Ratio, Caption Style
+- Min/Max Duration, Max Clips
+- Output Directory
+
 ### Contoh 13: Lihat Info Video
 
 ```cmd
@@ -474,14 +480,14 @@ sclip -i video.mp4 -f
 ### Contoh 16: Menggunakan Provider Berbeda
 
 ```cmd
-# Default: Groq untuk transcription dan analysis (GRATIS)
+# Default: OpenAI untuk transcription dan analysis
 sclip -i video.mp4
+
+# Gunakan Groq untuk alternatif gratis
+sclip -i video.mp4 --transcriber groq --analyzer groq
 
 # Gunakan Gemini untuk analysis
 sclip -i video.mp4 --analyzer gemini
-
-# Gunakan OpenAI untuk transcription
-sclip -i video.mp4 --transcriber openai
 
 # Mode offline (tanpa internet)
 sclip -i video.mp4 --transcriber local --analyzer ollama
@@ -587,31 +593,34 @@ SmartClip AI mendukung berbagai provider untuk transcription dan analysis.
 
 | Provider | Command | Keterangan |
 |----------|---------|------------|
-| Groq (Default) | `--transcriber groq` | Gratis, cepat, limit 25MB |
+| OpenAI (Default) | `--transcriber openai` | High quality, berbayar |
+| Groq | `--transcriber groq` | Gratis, cepat, limit 25MB |
 | Deepgram | `--transcriber deepgram` | $200 free credit, sangat cepat |
 | ElevenLabs | `--transcriber elevenlabs` | 99 bahasa, akurasi tinggi |
-| OpenAI | `--transcriber openai` | Berbayar, akurat |
 | Local | `--transcriber local` | Offline, butuh faster-whisper |
 
 ### Analysis Providers
 
 | Provider | Command | Keterangan |
 |----------|---------|------------|
-| Groq (Default) | `--analyzer groq` | Gratis, sangat cepat |
+| OpenAI (Default) | `--analyzer openai` | High quality, berbayar |
+| Groq | `--analyzer groq` | Gratis, sangat cepat |
 | DeepSeek | `--analyzer deepseek` | Sangat murah |
 | Gemini | `--analyzer gemini` | Free tier tersedia |
 | Mistral | `--analyzer mistral` | Free tier tersedia |
-| OpenAI | `--analyzer openai` | Berbayar, kualitas tinggi |
 | Ollama | `--analyzer ollama` | Offline, butuh Ollama |
 
 ### Contoh Kombinasi
 
 ```cmd
-# 100% Gratis (Default)
+# Default (OpenAI untuk semua)
 sclip -i video.mp4
 
-# Gratis dengan Gemini analysis
-sclip -i video.mp4 --analyzer gemini
+# Gratis dengan Groq
+sclip -i video.mp4 --transcriber groq --analyzer groq
+
+# Groq transcription + Gemini analysis
+sclip -i video.mp4 --transcriber groq --analyzer gemini
 
 # Deepgram + DeepSeek (murah)
 sclip -i video.mp4 --transcriber deepgram --analyzer deepseek
@@ -621,9 +630,6 @@ sclip -i video.mp4 --transcriber elevenlabs --analyzer mistral
 
 # 100% Offline
 sclip -i video.mp4 --transcriber local --analyzer ollama
-
-# Premium (OpenAI untuk semua)
-sclip -i video.mp4 --transcriber openai --analyzer openai
 ```
 
 ### Setup Offline Mode
@@ -639,6 +645,49 @@ pip install faster-whisper
 - Download dari https://ollama.ai
 - Jalankan: `ollama serve`
 - Pull model: `ollama pull llama3.2`
+
+---
+
+## 8.3. Config File
+
+SmartClip menyimpan konfigurasi di `~/.sclip/config.json`. Setelah menjalankan `sclip --setup`, semua pengaturan akan tersimpan dan digunakan secara otomatis.
+
+### Lokasi Config File
+
+- **Windows**: `C:\Users\<username>\.sclip\config.json`
+- **macOS/Linux**: `~/.sclip/config.json`
+
+### Contoh Config File
+
+```json
+{
+  "openai_api_key": "sk-xxx",
+  "openai_base_url": "https://api.together.xyz/v1",
+  "groq_api_key": "gsk_xxx",
+  "default_transcriber": "openai",
+  "default_analyzer": "openai",
+  "default_transcriber_model": "whisper-1",
+  "default_analyzer_model": "gpt-4o-mini",
+  "default_language": "id",
+  "default_aspect_ratio": "9:16",
+  "default_caption_style": "default",
+  "min_duration": 60,
+  "max_duration": 180,
+  "max_clips": 5,
+  "default_output_dir": "./output"
+}
+```
+
+### Prioritas Konfigurasi
+
+```
+CLI flag > Environment variable > Config file > Default
+```
+
+Contoh:
+- Jika `default_analyzer_model` di config adalah `gpt-4o-mini`
+- Tapi kamu jalankan `sclip -i video.mp4 --analyzer-model gpt-4o`
+- Maka yang dipakai adalah `gpt-4o` (CLI flag menang)
 
 ---
 
@@ -813,7 +862,7 @@ sclip [options]
 | `--url` | `-u` | - | YouTube URL |
 | `--output` | `-o` | `./output` | Folder output |
 | `--max-clips` | `-n` | `5` | Maksimum clips |
-| `--min-duration` | - | `45` | Durasi minimum (detik) |
+| `--min-duration` | - | `60` | Durasi minimum (detik) |
 | `--max-duration` | - | `180` | Durasi maksimum (detik) |
 | `--aspect-ratio` | `-a` | `9:16` | Aspect ratio output |
 | `--caption-style` | `-s` | `default` | Style caption |
@@ -825,8 +874,8 @@ sclip [options]
 | `--no-captions` | - | `false` | Skip captions |
 | `--no-metadata` | - | `false` | Skip metadata |
 | `--keep-temp` | - | `false` | Keep temp files |
-| `--transcriber` | - | `groq` | Provider transcription |
-| `--analyzer` | - | `groq` | Provider analysis |
+| `--transcriber` | - | `openai` | Provider transcription |
+| `--analyzer` | - | `openai` | Provider analysis |
 | `--groq-api-key` | - | env var | Groq API key |
 | `--deepgram-api-key` | - | env var | Deepgram API key |
 | `--elevenlabs-api-key` | - | env var | ElevenLabs API key |
@@ -837,6 +886,7 @@ sclip [options]
 | `--transcriber-model` | - | auto | Model transcription |
 | `--analyzer-model` | - | auto | Model analysis |
 | `--ollama-host` | - | `localhost:11434` | Ollama server |
+| `--openai-base-url` | - | config/env | Custom OpenAI-compatible URL |
 | `--ffmpeg-path` | - | auto | Custom FFmpeg path |
 | `--info` | - | `false` | Show video info |
 | `--check-deps` | - | `false` | Check dependencies |
@@ -900,13 +950,13 @@ A:
 **Q: Provider mana yang sebaiknya saya gunakan?**
 
 A:
-- **Groq (Default)**: GRATIS, cepat, recommended untuk kebanyakan pengguna
+- **OpenAI (Default)**: High quality, berbayar, recommended untuk hasil terbaik
+- **Groq**: GRATIS, cepat, recommended untuk budget terbatas
 - **Deepgram**: $200 free credit, sangat cepat, akurat
 - **ElevenLabs**: 99 bahasa, akurasi tinggi
 - **DeepSeek**: Sangat murah, kualitas bagus
 - **Mistral**: Free tier tersedia, bagus untuk Eropa
 - **Gemini**: Free tier tersedia, context window besar
-- **OpenAI**: Berbayar, kualitas tinggi
 - **Ollama**: Offline, butuh GPU untuk performa optimal
 - **Local Whisper**: Offline transcription, lebih lambat di CPU
 
@@ -914,8 +964,9 @@ A:
 
 A: Rate limit adalah batasan jumlah request ke API dalam periode waktu tertentu. Jika kamu mendapat error "Rate limit exceeded":
 1. Tunggu beberapa menit sebelum mencoba lagi
-2. Groq dan Gemini free tier memiliki batasan per menit dan per hari
-3. Untuk penggunaan intensif, pertimbangkan upgrade ke paid tier atau gunakan provider berbeda
+2. OpenAI: cek usage di platform.openai.com
+3. Groq dan Gemini free tier memiliki batasan per menit dan per hari
+4. Untuk penggunaan intensif, pertimbangkan upgrade ke paid tier atau gunakan provider berbeda
 
 **Q: API key saya tidak berfungsi, apa yang harus dilakukan?**
 

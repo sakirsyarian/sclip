@@ -28,19 +28,19 @@ Video → Extract Audio → Transcribe (Whisper) → Analyze (LLM) → Render
 **Transcription Providers:**
 | Provider | Speed | Cost | Offline |
 |----------|-------|------|---------|
+| OpenAI Whisper (default) | Fast | $0.006/min | ❌ |
 | Groq Whisper | ⚡ Very Fast | Free | ❌ |
 | Deepgram Nova | ⚡ Very Fast | $200 free credit | ❌ |
 | ElevenLabs Scribe | Fast | Paid | ❌ |
-| OpenAI Whisper | Fast | $0.006/min | ❌ |
 | Local (faster-whisper) | Depends on HW | Free | ✅ |
 
 **Analysis Providers:**
 | Provider | Speed | Cost | Offline |
 |----------|-------|------|---------|
+| OpenAI GPT-4 (default) | Fast | Paid | ❌ |
 | Groq (Llama 3.3) | ⚡ Very Fast | Free | ❌ |
 | DeepSeek | Fast | Very affordable | ❌ |
 | Gemini | Fast | Free tier | ❌ |
-| OpenAI (GPT-4) | Fast | Paid | ❌ |
 | Mistral | Fast | Free tier | ❌ |
 | Ollama | Depends on HW | Free | ✅ |
 
@@ -131,23 +131,23 @@ pip install yt-dlp
 ### 4. Configure API Key
 
 ```bash
-# Option 1: Groq API key (RECOMMENDED - free & fast)
+# Option 1: OpenAI API key (DEFAULT - high quality)
+export OPENAI_API_KEY="your-openai-api-key"
+
+# Option 2: Groq API key (free & fast alternative)
 export GROQ_API_KEY="your-groq-api-key"
 
-# Option 2: Gemini API key (optional, for Gemini analyzer)
+# Option 3: Gemini API key (optional, for Gemini analyzer)
 export GEMINI_API_KEY="your-gemini-api-key"
-
-# Option 3: OpenAI API key (optional, paid)
-export OPENAI_API_KEY="your-openai-api-key"
 
 # Or run setup wizard
 sclip --setup
 ```
 
-Get your free API keys:
-- **Groq**: [console.groq.com](https://console.groq.com) (Recommended)
+Get your API keys:
+- **OpenAI**: [platform.openai.com](https://platform.openai.com/api-keys) (Default)
+- **Groq**: [console.groq.com](https://console.groq.com) (Free alternative)
 - **Gemini**: [aistudio.google.com](https://aistudio.google.com/apikey)
-- **OpenAI**: [platform.openai.com](https://platform.openai.com/api-keys)
 
 ### 5. Verify Installation
 
@@ -164,8 +164,8 @@ Checking dependencies...
 ✓ yt-dlp: found (/usr/bin/yt-dlp)
 
 API Keys:
-  ✓ GROQ_API_KEY: configured (gsk_...xxxx)
-  ⚠ OPENAI_API_KEY: not configured (optional)
+  ✓ OPENAI_API_KEY: configured (sk-...xxxx) [DEFAULT]
+  ⚠ GROQ_API_KEY: not configured (optional - free alternative)
   ⚠ GEMINI_API_KEY: not configured (optional)
 
 Local Providers:
@@ -174,7 +174,10 @@ Local Providers:
 
 All required dependencies are available!
 
-Default setup (100% free):
+Default setup:
+  --transcriber openai --analyzer openai
+
+Free alternative:
   --transcriber groq --analyzer groq
 
 Offline setup:
@@ -184,7 +187,7 @@ Offline setup:
 ## Quick Start
 
 ```bash
-# Process a local video (default: Groq transcription + Groq analysis - FREE)
+# Process a local video (default: OpenAI transcription + OpenAI analysis)
 sclip -i podcast.mp4
 
 # Process a YouTube video
@@ -193,8 +196,8 @@ sclip -u "https://youtube.com/watch?v=xxxxx"
 # Preview clips without rendering (dry run)
 sclip -i video.mp4 --dry-run
 
-# Use Gemini for analysis instead
-sclip -i video.mp4 --analyzer gemini
+# Use Groq for free alternative
+sclip -i video.mp4 --transcriber groq --analyzer groq
 
 # Fully offline mode (requires faster-whisper + Ollama)
 sclip -i video.mp4 --transcriber local --analyzer ollama
@@ -221,11 +224,11 @@ sclip -i podcast.mp4 -o ./my-clips
 # Generate exactly 3 clips
 sclip -i video.mp4 -n 3
 
-# Set duration range: 30-90 seconds per clip
-sclip -i video.mp4 --min-duration 30 --max-duration 90
+# Set duration range: 60-120 seconds per clip
+sclip -i video.mp4 --min-duration 60 --max-duration 120
 
-# Generate shorter clips (15-60 seconds)
-sclip -i webinar.mp4 --min-duration 15 --max-duration 60
+# Generate shorter clips (30-90 seconds)
+sclip -i webinar.mp4 --min-duration 30 --max-duration 90
 ```
 
 ### Aspect Ratio Options
@@ -279,31 +282,39 @@ sclip -i video.mp4 --keep-temp
 ### Provider Options
 
 ```bash
-# Default: Groq for both transcription and analysis (FREE)
+# Default: OpenAI for both transcription and analysis
 sclip -i video.mp4
 
+# Use external subtitle file (skip transcription - faster & free)
+sclip -i video.mp4 --subtitle subtitle.srt
+sclip -i video.mp4 --subtitle captions.vtt --analyzer gemini
+
 # Use different transcription provider
-sclip -i video.mp4 --transcriber openai      # OpenAI Whisper (paid)
-sclip -i video.mp4 --transcriber deepgram    # Deepgram Nova ($200 free credit)
-sclip -i video.mp4 --transcriber elevenlabs  # ElevenLabs Scribe (99 languages)
-sclip -i video.mp4 --transcriber local       # Local faster-whisper (offline)
+sclip -i video.mp4 --transcriber groq         # Groq Whisper (free)
+sclip -i video.mp4 --transcriber deepgram     # Deepgram Nova ($200 free credit)
+sclip -i video.mp4 --transcriber elevenlabs   # ElevenLabs Scribe (99 languages)
+sclip -i video.mp4 --transcriber local        # Local faster-whisper (offline)
 
 # Use different analysis provider
-sclip -i video.mp4 --analyzer deepseek       # DeepSeek (very affordable)
-sclip -i video.mp4 --analyzer gemini         # Google Gemini
-sclip -i video.mp4 --analyzer mistral        # Mistral AI (free tier)
-sclip -i video.mp4 --analyzer openai         # OpenAI GPT-4 (paid)
-sclip -i video.mp4 --analyzer ollama         # Local Ollama (offline)
+sclip -i video.mp4 --analyzer groq            # Groq LLMs (free)
+sclip -i video.mp4 --analyzer deepseek        # DeepSeek (very affordable)
+sclip -i video.mp4 --analyzer gemini          # Google Gemini
+sclip -i video.mp4 --analyzer mistral         # Mistral AI (free tier)
+sclip -i video.mp4 --analyzer ollama          # Local Ollama (offline)
 
 # Fully offline mode
 sclip -i video.mp4 --transcriber local --analyzer ollama
 
 # Specify models
 sclip -i video.mp4 --transcriber-model whisper-large-v3
-sclip -i video.mp4 --analyzer-model llama-3.3-70b-versatile
+sclip -i video.mp4 --analyzer-model gpt-4o
 
 # Custom Ollama host
 sclip -i video.mp4 --analyzer ollama --ollama-host http://192.168.1.100:11434
+
+# Custom OpenAI-compatible endpoint (Together AI, OpenRouter, LM Studio, etc.)
+sclip -i video.mp4 --analyzer openai --openai-base-url https://api.together.xyz/v1 --analyzer-model meta-llama/Llama-3-70b-chat-hf
+sclip -i video.mp4 --analyzer openai --openai-base-url http://localhost:1234/v1 --analyzer-model local-model
 ```
 
 ### Advanced Options
@@ -325,14 +336,20 @@ sclip -i video.mp4 -q
 ### Real-World Workflows
 
 ```bash
-# Podcast episode → TikTok clips (FREE with Groq)
-sclip -i "podcast_ep42.mp4" -n 5 -a 9:16 -s bold --min-duration 45 --max-duration 120
+# Podcast episode → TikTok clips (default OpenAI)
+sclip -i "podcast_ep42.mp4" -n 5 -a 9:16 -s bold --min-duration 60 --max-duration 120
+
+# Use existing subtitle file (skip transcription - faster!)
+sclip -i "podcast_ep42.mp4" --subtitle "podcast_ep42.srt" -n 5 -a 9:16 -s bold
 
 # Interview → Instagram Reels with Gemini analysis
 sclip -u "https://youtube.com/watch?v=xxxxx" -n 3 -a 9:16 -s karaoke --analyzer gemini
 
 # Webinar → LinkedIn clips (square format, minimal captions)
-sclip -i "webinar_recording.mp4" -n 4 -a 1:1 -s minimal --min-duration 45 --max-duration 90
+sclip -i "webinar_recording.mp4" -n 4 -a 1:1 -s minimal --min-duration 60 --max-duration 90
+
+# Free alternative with Groq
+sclip -i "video.mp4" --transcriber groq --analyzer groq
 
 # Offline processing (no internet required)
 sclip -i "confidential_meeting.mp4" --transcriber local --analyzer ollama
@@ -356,6 +373,14 @@ sclip [OPTIONS]
 | `--url` | `-u` | YouTube URL to download and process |
 | `--input` | `-i` | Path to local video file |
 
+### Subtitle Options
+
+| Flag | Description |
+|------|-------------|
+| `--subtitle` | External subtitle file (.srt or .vtt) to skip transcription |
+
+Using `--subtitle` skips the transcription step entirely, making processing faster and free (no transcription API cost). This is useful when you already have accurate subtitles.
+
 ### Output Options
 
 | Flag | Alias | Default | Description |
@@ -369,7 +394,7 @@ sclip [OPTIONS]
 | Flag | Alias | Default | Description |
 |------|-------|---------|-------------|
 | `--max-clips` | `-n` | `5` | Maximum number of clips to generate |
-| `--min-duration` | | `45` | Minimum clip duration (seconds) |
+| `--min-duration` | | `60` | Minimum clip duration (seconds) |
 | `--max-duration` | | `180` | Maximum clip duration (seconds) |
 | `--aspect-ratio` | `-a` | `9:16` | Output ratio: `9:16`, `1:1`, `16:9` |
 
@@ -385,8 +410,8 @@ sclip [OPTIONS]
 
 | Flag | Alias | Default | Description |
 |------|-------|---------|-------------|
-| `--transcriber` | | `groq` | Transcription provider: `groq`, `openai`, `deepgram`, `elevenlabs`, `local` |
-| `--analyzer` | | `groq` | Analysis provider: `groq`, `deepseek`, `gemini`, `openai`, `mistral`, `ollama` |
+| `--transcriber` | | `openai` | Transcription provider: `openai`, `groq`, `deepgram`, `elevenlabs`, `local` |
+| `--analyzer` | | `openai` | Analysis provider: `openai`, `groq`, `deepseek`, `gemini`, `mistral`, `ollama` |
 | `--groq-api-key` | | env var | Groq API key |
 | `--openai-api-key` | | env var | OpenAI API key |
 | `--gemini-api-key` | | env var | Gemini API key |
@@ -397,6 +422,7 @@ sclip [OPTIONS]
 | `--transcriber-model` | | auto | Model for transcription |
 | `--analyzer-model` | | auto | Model for analysis |
 | `--ollama-host` | | `localhost:11434` | Ollama server URL |
+| `--openai-base-url` | | config/env | Custom OpenAI-compatible API URL |
 
 ### Utility Options
 
@@ -427,11 +453,11 @@ sclip [OPTIONS]
 **Analysis (LLM):**
 | Provider | Models | Default |
 |----------|--------|---------|
-| groq | `openai/gpt-oss-120b`, `llama-3.3-70b-versatile`, `mixtral-8x7b-32768` | `openai/gpt-oss-120b` |
+| openai | `gpt-4o`, `gpt-4o-mini`, `gpt-4-turbo` | `gpt-4o-mini` |
+| groq | `openai/gpt-oss-120b`, `llama-3.3-70b-versatile` | `openai/gpt-oss-120b` |
 | deepseek | `deepseek-chat`, `deepseek-reasoner` | `deepseek-chat` |
 | gemini | `gemini-2.0-flash`, `gemini-1.5-pro` | `gemini-2.0-flash` |
 | mistral | `mistral-small-latest`, `mistral-large-latest`, `open-mistral-nemo` | `mistral-small-latest` |
-| openai | `gpt-4o`, `gpt-4o-mini` | `gpt-4o-mini` |
 | ollama | Any installed model | `llama3.2` |
 
 ### Flag Conflicts
@@ -460,15 +486,16 @@ Location: `~/.sclip/config.json`
 
 ```json
 {
-  "groq_api_key": "your-groq-api-key",
-  "openai_api_key": null,
+  "openai_api_key": "your-openai-api-key",
+  "openai_base_url": null,
+  "groq_api_key": null,
   "gemini_api_key": null,
   "deepgram_api_key": null,
   "deepseek_api_key": null,
   "elevenlabs_api_key": null,
   "mistral_api_key": null,
-  "default_transcriber": "groq",
-  "default_analyzer": "groq",
+  "default_transcriber": "openai",
+  "default_analyzer": "openai",
   "default_transcriber_model": null,
   "default_analyzer_model": null,
   "ollama_host": "http://localhost:11434",
@@ -478,23 +505,39 @@ Location: `~/.sclip/config.json`
   "default_caption_style": "default",
   "default_language": "id",
   "max_clips": 5,
-  "min_duration": 45,
+  "min_duration": 60,
   "max_duration": 180
 }
 ```
+
+### Config Options
+
+| Key | Description | Default |
+|-----|-------------|---------|
+| `openai_api_key` | OpenAI API key | - |
+| `openai_base_url` | Custom OpenAI-compatible API URL | - |
+| `groq_api_key` | Groq API key (free alternative) | - |
+| `default_transcriber` | Default transcription provider | `openai` |
+| `default_analyzer` | Default analysis provider | `openai` |
+| `default_transcriber_model` | Default model for transcription | auto |
+| `default_analyzer_model` | Default model for analysis | auto |
+| `default_language` | Language code for captions | `id` |
+| `min_duration` | Minimum clip duration (seconds) | `60` |
+| `max_duration` | Maximum clip duration (seconds) | `180` |
 
 ### Environment Variables
 
 | Variable | Description |
 |----------|-------------|
-| `GROQ_API_KEY` | Groq API key (transcription + analysis) |
+| `OPENAI_API_KEY` | OpenAI API key (default provider) |
+| `GROQ_API_KEY` | Groq API key (free alternative) |
 | `GEMINI_API_KEY` | Google Gemini API key |
-| `OPENAI_API_KEY` | OpenAI API key |
 | `DEEPGRAM_API_KEY` | Deepgram API key ($200 free credit) |
 | `DEEPSEEK_API_KEY` | DeepSeek API key (very affordable) |
 | `ELEVENLABS_API_KEY` | ElevenLabs API key (99 languages) |
 | `MISTRAL_API_KEY` | Mistral API key (free tier) |
 | `OLLAMA_HOST` | Ollama server URL (default: http://localhost:11434) |
+| `OPENAI_BASE_URL` | Custom OpenAI-compatible API URL |
 | `SCLIP_CONFIG` | Custom config file path |
 | `SCLIP_OUTPUT_DIR` | Default output directory |
 
@@ -551,6 +594,7 @@ sclip --setup
 
 ### Rate limit exceeded
 
+- OpenAI: Check your usage at platform.openai.com
 - Groq free tier: 30 requests/minute, 14,400 requests/day
 - Gemini free tier: 15 requests/minute
 - Wait a few minutes and retry

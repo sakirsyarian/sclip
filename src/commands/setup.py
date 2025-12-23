@@ -259,30 +259,58 @@ def _setup_groq_api_key(current_config: Config) -> Optional[str]:
     return None
 
 
-def _setup_openai_api_key(current_config: Config) -> Optional[str]:
-    """Setup OpenAI API key (optional - paid)."""
+def _setup_openai_api_key(current_config: Config) -> tuple[Optional[str], Optional[str]]:
+    """Setup OpenAI API key and custom base URL (optional - paid or custom endpoint)."""
     logger = get_logger()
     console = logger.console
     
-    console.print("\n[bold cyan]━━━ OpenAI API Key (Optional - Paid) ━━━[/bold cyan]\n")
+    console.print("\n[bold cyan]━━━ OpenAI / Custom Endpoint Setup ━━━[/bold cyan]\n")
     console.print("OpenAI provides high-quality transcription and analysis.")
-    console.print("[yellow]Note: This is a paid service.[/yellow]")
+    console.print("You can also use OpenAI-compatible APIs like:")
+    console.print("  • Together AI (https://api.together.xyz/v1)")
+    console.print("  • OpenRouter (https://openrouter.ai/api/v1)")
+    console.print("  • LM Studio (http://localhost:1234/v1)")
+    console.print("  • vLLM (http://localhost:8000/v1)")
     console.print()
     
     existing_key = get_openai_api_key()
+    existing_url = current_config.openai_base_url
+    
     if existing_key:
-        console.print(f"[green]✓[/green] Already configured: {_mask_key(existing_key)}")
-        if not Confirm.ask("Update OpenAI API key?", default=False):
-            return None
+        console.print(f"[green]✓[/green] API Key: {_mask_key(existing_key)}")
+    if existing_url:
+        console.print(f"[green]✓[/green] Base URL: {existing_url}")
     
-    if not Confirm.ask("Configure OpenAI API key?", default=False):
-        return None
+    if existing_key or existing_url:
+        if not Confirm.ask("Update OpenAI settings?", default=False):
+            return None, None
     
-    console.print(f"  Get key at: [link={OPENAI_API_URL}]{OPENAI_API_URL}[/link]")
+    if not Confirm.ask("Configure OpenAI / Custom endpoint?", default=False):
+        return None, None
+    
+    # API Key
+    console.print()
+    console.print("Enter API key from your provider:")
+    console.print(f"  OpenAI: [link={OPENAI_API_URL}]{OPENAI_API_URL}[/link]")
+    console.print("  Together AI: https://api.together.xyz/settings/api-keys")
+    console.print("  OpenRouter: https://openrouter.ai/keys")
     console.print()
     
-    api_key = Prompt.ask("Enter OpenAI API key", default="", password=True)
-    return api_key.strip() if api_key.strip() else None
+    api_key = Prompt.ask("API key", default="", password=True)
+    api_key = api_key.strip() if api_key.strip() else None
+    
+    # Base URL
+    console.print()
+    console.print("Custom base URL (leave empty for official OpenAI):")
+    console.print("  Together AI: https://api.together.xyz/v1")
+    console.print("  OpenRouter: https://openrouter.ai/api/v1")
+    console.print("  LM Studio: http://localhost:1234/v1")
+    console.print()
+    
+    base_url = Prompt.ask("Base URL", default=existing_url or "")
+    base_url = base_url.strip() if base_url.strip() else None
+    
+    return api_key, base_url
 
 
 def _setup_gemini_api_key(current_config: Config) -> Optional[str]:
@@ -311,43 +339,80 @@ def _setup_gemini_api_key(current_config: Config) -> Optional[str]:
     return api_key.strip() if api_key.strip() else None
 
 
-def _setup_default_providers(current_config: Config) -> tuple[Optional[TranscriberProvider], Optional[AnalyzerProvider]]:
-    """Setup default transcriber and analyzer providers."""
+def _setup_default_providers(current_config: Config) -> tuple[Optional[TranscriberProvider], Optional[AnalyzerProvider], Optional[str], Optional[str]]:
+    """Setup default transcriber and analyzer providers with models."""
     logger = get_logger()
     console = logger.console
     
     console.print("\n[bold cyan]━━━ Default Providers ━━━[/bold cyan]\n")
     
     console.print("Available transcribers:")
-    console.print("  [green]1. groq[/green]  - Groq Whisper (FREE, fast, recommended)")
-    console.print("  2. openai - OpenAI Whisper (paid)")
-    console.print("  3. local  - faster-whisper (offline, slower)")
+    console.print("  [green]1. openai[/green] - OpenAI Whisper (default, high quality)")
+    console.print("  2. groq   - Groq Whisper (free, fast)")
+    console.print("  3. deepgram - Deepgram Nova ($200 free credit)")
+    console.print("  4. elevenlabs - ElevenLabs Scribe (99 languages)")
+    console.print("  5. local  - faster-whisper (offline, slower)")
     console.print()
     
     transcriber_choice = Prompt.ask(
         "Default transcriber",
-        choices=["groq", "openai", "local", ""],
+        choices=["openai", "groq", "deepgram", "elevenlabs", "local", ""],
         default=current_config.default_transcriber
     )
     
     console.print()
     console.print("Available analyzers:")
-    console.print("  [green]1. groq[/green]   - Groq Llama 3.3 (FREE, fast, recommended)")
-    console.print("  2. gemini - Google Gemini (free tier)")
-    console.print("  3. openai - OpenAI GPT-4 (paid)")
-    console.print("  4. ollama - Local LLM (offline)")
+    console.print("  [green]1. openai[/green] - OpenAI GPT-4 (default, high quality)")
+    console.print("  2. groq   - Groq Llama 3.3 (free, fast)")
+    console.print("  3. deepseek - DeepSeek (very affordable)")
+    console.print("  4. gemini - Google Gemini (free tier)")
+    console.print("  5. mistral - Mistral AI (free tier)")
+    console.print("  6. ollama - Local LLM (offline)")
     console.print()
     
     analyzer_choice = Prompt.ask(
         "Default analyzer",
-        choices=["groq", "gemini", "openai", "ollama", ""],
+        choices=["openai", "groq", "deepseek", "gemini", "mistral", "ollama", ""],
         default=current_config.default_analyzer
     )
     
     transcriber = transcriber_choice if transcriber_choice else None
     analyzer = analyzer_choice if analyzer_choice else None
     
-    return transcriber, analyzer
+    # Setup default models
+    transcriber_model = None
+    analyzer_model = None
+    
+    if Confirm.ask("\nConfigure default models?", default=False):
+        console.print()
+        console.print("[bold]Transcriber Models:[/bold]")
+        console.print("  OpenAI: whisper-1")
+        console.print("  Groq: whisper-large-v3, whisper-large-v3-turbo")
+        console.print("  Deepgram: nova-3, nova-2")
+        console.print("  Local: tiny, base, small, medium, large-v3")
+        console.print()
+        
+        current_t_model = current_config.default_transcriber_model or ""
+        t_model = Prompt.ask("Default transcriber model (Enter to skip)", default=current_t_model)
+        if t_model.strip():
+            transcriber_model = t_model.strip()
+        
+        console.print()
+        console.print("[bold]Analyzer Models:[/bold]")
+        console.print("  OpenAI: gpt-4o, gpt-4o-mini, gpt-4-turbo")
+        console.print("  Groq: openai/gpt-oss-120b, llama-3.3-70b-versatile")
+        console.print("  DeepSeek: deepseek-chat, deepseek-reasoner")
+        console.print("  Gemini: gemini-2.0-flash, gemini-1.5-pro")
+        console.print("  Mistral: mistral-small-latest, mistral-large-latest")
+        console.print("  Custom endpoint: any model supported by your provider")
+        console.print()
+        
+        current_a_model = current_config.default_analyzer_model or ""
+        a_model = Prompt.ask("Default analyzer model (Enter to skip)", default=current_a_model)
+        if a_model.strip():
+            analyzer_model = a_model.strip()
+    
+    return transcriber, analyzer, transcriber_model, analyzer_model
 
 
 def _setup_ffmpeg(current_config: Config) -> Optional[str]:
@@ -505,6 +570,31 @@ def _setup_defaults(current_config: Config) -> dict:
     except ValueError:
         pass
     
+    # Min duration
+    console.print()
+    console.print("Minimum clip duration (seconds):")
+    min_dur = Prompt.ask("Min duration", default=str(current_config.min_duration))
+    try:
+        settings["min_duration"] = int(min_dur)
+    except ValueError:
+        pass
+    
+    # Max duration
+    console.print()
+    console.print("Maximum clip duration (seconds):")
+    max_dur = Prompt.ask("Max duration", default=str(current_config.max_duration))
+    try:
+        settings["max_duration"] = int(max_dur)
+    except ValueError:
+        pass
+    
+    # Output directory
+    console.print()
+    console.print("Default output directory:")
+    output_dir = Prompt.ask("Output directory", default=current_config.default_output_dir)
+    if output_dir.strip():
+        settings["output_dir"] = output_dir.strip()
+    
     return settings
 
 
@@ -513,8 +603,11 @@ def _save_setup_config(
     groq_key: Optional[str],
     openai_key: Optional[str],
     gemini_key: Optional[str],
+    openai_base_url: Optional[str],
     transcriber: Optional[TranscriberProvider],
     analyzer: Optional[AnalyzerProvider],
+    transcriber_model: Optional[str],
+    analyzer_model: Optional[str],
     ffmpeg_path: Optional[str],
     ollama_host: Optional[str],
     defaults: dict,
@@ -532,7 +625,10 @@ def _save_setup_config(
         # Providers
         default_transcriber=transcriber if transcriber else current_config.default_transcriber,
         default_analyzer=analyzer if analyzer else current_config.default_analyzer,
+        default_transcriber_model=transcriber_model if transcriber_model else current_config.default_transcriber_model,
+        default_analyzer_model=analyzer_model if analyzer_model else current_config.default_analyzer_model,
         ollama_host=ollama_host if ollama_host else current_config.ollama_host,
+        openai_base_url=openai_base_url if openai_base_url else current_config.openai_base_url,
         # FFmpeg
         ffmpeg_path=ffmpeg_path if ffmpeg_path else current_config.ffmpeg_path,
         # Defaults
@@ -540,9 +636,9 @@ def _save_setup_config(
         default_aspect_ratio=defaults.get("aspect_ratio", current_config.default_aspect_ratio),
         default_caption_style=defaults.get("caption_style", current_config.default_caption_style),
         max_clips=defaults.get("max_clips", current_config.max_clips),
-        min_duration=current_config.min_duration,
-        max_duration=current_config.max_duration,
-        default_output_dir=current_config.default_output_dir,
+        min_duration=defaults.get("min_duration", current_config.min_duration),
+        max_duration=defaults.get("max_duration", current_config.max_duration),
+        default_output_dir=defaults.get("output_dir", current_config.default_output_dir),
     )
     
     try:
@@ -594,13 +690,17 @@ def run_setup_wizard() -> int:
     groq_key = _setup_groq_api_key(current_config)
     
     # Step 2: Other API Keys (optional)
+    openai_key = None
+    openai_base_url = None
     if Confirm.ask("\nConfigure other API providers?", default=False):
-        openai_key = _setup_openai_api_key(current_config)
+        openai_key, openai_base_url = _setup_openai_api_key(current_config)
         gemini_key = _setup_gemini_api_key(current_config)
     
     # Step 3: Default providers
+    transcriber_model = None
+    analyzer_model = None
     if Confirm.ask("\nConfigure default providers?", default=False):
-        transcriber, analyzer = _setup_default_providers(current_config)
+        transcriber, analyzer, transcriber_model, analyzer_model = _setup_default_providers(current_config)
     
     # Step 4: FFmpeg
     if not status["ffmpeg"]["found"] or Confirm.ask("\nConfigure FFmpeg?", default=False):
@@ -620,8 +720,8 @@ def run_setup_wizard() -> int:
     # Save configuration
     _save_setup_config(
         current_config,
-        groq_key, openai_key, gemini_key,
-        transcriber, analyzer,
+        groq_key, openai_key, gemini_key, openai_base_url,
+        transcriber, analyzer, transcriber_model, analyzer_model,
         ffmpeg_path, ollama_host,
         defaults
     )

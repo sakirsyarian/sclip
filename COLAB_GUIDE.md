@@ -9,8 +9,9 @@ Panduan lengkap untuk pemula cara menggunakan SmartClip AI di Google Colab.
 3. [Cara Upload Notebook ke Colab](#cara-upload-notebook-ke-colab)
 4. [Cara Menggunakan SmartClip AI di Colab](#cara-menggunakan-smartclip-ai-di-colab)
 5. [Provider Options](#provider-options)
-6. [Mode Offline di Colab](#mode-offline-di-colab-ollama--local-whisper)
-7. [Tips & Troubleshooting](#tips--troubleshooting)
+6. [Custom OpenAI-Compatible API](#custom-openai-compatible-api)
+7. [Mode Offline di Colab](#mode-offline-di-colab-ollama--local-whisper)
+8. [Tips & Troubleshooting](#tips--troubleshooting)
 
 ---
 
@@ -41,10 +42,22 @@ Sebelum mulai, pastikan kamu punya:
 
 ### 2. API Key (Pilih Salah Satu)
 
-**🌟 Groq API Key (GRATIS - Recommended):**
+**🌟 OpenAI API Key (Default - Recommended):**
+1. Buka [OpenAI Platform](https://platform.openai.com/api-keys)
+2. Login atau buat akun
+3. Klik **"Create new secret key"**
+4. Copy API key yang muncul
+
+**Groq API Key (GRATIS):**
 1. Buka [Groq Console](https://console.groq.com)
 2. Login dengan Google atau GitHub
 3. Klik **"API Keys"** → **"Create API Key"**
+4. Copy API key yang muncul
+
+**Gemini API Key (Free Tier):**
+1. Buka [Google AI Studio](https://aistudio.google.com/apikey)
+2. Login dengan akun Google
+3. Klik **"Create API Key"**
 4. Copy API key yang muncul
 
 **Deepgram API Key ($200 Free Credit):**
@@ -69,12 +82,6 @@ Sebelum mulai, pastikan kamu punya:
 1. Buka [Mistral Console](https://console.mistral.ai)
 2. Sign up dan login
 3. Buat API key di dashboard
-4. Copy API key yang muncul
-
-**Gemini API Key (Free Tier):**
-1. Buka [Google AI Studio](https://aistudio.google.com/apikey)
-2. Login dengan akun Google
-3. Klik **"Create API Key"**
 4. Copy API key yang muncul
 
 ### 3. Video yang Ingin Diproses
@@ -144,16 +151,22 @@ GPU membuat proses face tracking lebih cepat.
 
 ### Langkah 3: Masukkan API Key
 
-1. Klik cell kedua (🔑 Enter API Key)
-2. Jalankan cell (klik Play atau Ctrl+Enter)
-3. Akan muncul kotak input, paste **Groq API key** kamu
-4. Tekan Enter
-5. Pastikan muncul "✅ API key configured"
+1. Klik cell kedua (🔑 API Configuration)
+2. Pilih provider yang ingin digunakan:
+   - `openai` - Default, kualitas tinggi
+   - `groq` - Gratis, sangat cepat
+   - `gemini` - Free tier tersedia
+   - `custom` - Untuk OpenAI-compatible API (Together AI, OpenRouter, dll)
+3. Jika pilih `custom`, isi `custom_base_url` dengan URL API
+4. Jalankan cell (klik Play atau Ctrl+Enter)
+5. Akan muncul kotak input, paste API key kamu
+6. Tekan Enter
+7. Pastikan muncul "API key configured!"
 
 **Tips:** Untuk menyimpan API key agar tidak perlu input ulang:
 1. Klik ikon 🔑 di sidebar kiri (Secrets)
 2. Klik **Add new secret**
-3. Name: `GROQ_API_KEY`
+3. Name: `OPENAI_API_KEY` (atau `GROQ_API_KEY`, `GEMINI_API_KEY`)
 4. Value: (paste API key kamu)
 5. Toggle **Notebook access** ke ON
 
@@ -189,14 +202,14 @@ GPU membuat proses face tracking lebih cepat.
 | Pengaturan | Penjelasan |
 |------------|------------|
 | `max_clips` | Jumlah clip yang dihasilkan (1-10) |
+| `min_duration` | Durasi minimum clip (default: 60 detik) |
+| `max_duration` | Durasi maksimum clip (default: 180 detik) |
 | `aspect_ratio` | 9:16 (TikTok/Reels), 1:1 (Instagram), 16:9 (YouTube) |
 | `caption_style` | Gaya caption: default, bold, minimal, karaoke |
 | `language` | Bahasa caption: id (Indonesia), en (English), dll |
-| `min_duration` | Durasi minimum clip (detik) |
-| `max_duration` | Durasi maksimum clip (detik) |
-| `transcriber` | Provider transcription (groq, deepgram, elevenlabs, openai, local) |
-| `analyzer` | Provider analysis (groq, deepseek, gemini, mistral, openai, ollama) |
-| `no_captions` | Centang jika tidak mau caption |
+| `transcriber_provider` | Provider transcription (openai, groq, local) |
+| `analyzer_provider` | Provider analysis (openai, groq, gemini) |
+| `custom_model` | Model kustom (opsional, contoh: gpt-4o, MiniMax-M2.1) |
 | `dry_run` | Centang untuk preview tanpa render |
 
 3. Jalankan cell
@@ -229,38 +242,105 @@ SmartClip AI mendukung berbagai provider untuk transcription dan analysis:
 
 | Provider | CLI Option | API Key Env | Keterangan |
 |----------|------------|-------------|------------|
-| **Groq** (Default) | `--transcriber groq` | `GROQ_API_KEY` | ⚡ Gratis, sangat cepat |
+| **OpenAI** (Default) | `--transcriber openai` | `OPENAI_API_KEY` | Akurat, berbayar |
+| **Groq** | `--transcriber groq` | `GROQ_API_KEY` | ⚡ Gratis, sangat cepat |
 | **Deepgram** | `--transcriber deepgram` | `DEEPGRAM_API_KEY` | $200 free credit, sangat cepat |
 | **ElevenLabs** | `--transcriber elevenlabs` | `ELEVENLABS_API_KEY` | 99 bahasa, akurasi tinggi |
-| **OpenAI** | `--transcriber openai` | `OPENAI_API_KEY` | Berbayar, akurat |
 | **Local** | `--transcriber local` | - | Offline, butuh GPU |
 
 ### Analysis Providers
 
 | Provider | CLI Option | API Key Env | Keterangan |
 |----------|------------|-------------|------------|
-| **Groq** (Default) | `--analyzer groq` | `GROQ_API_KEY` | ⚡ Gratis, sangat cepat |
-| **DeepSeek** | `--analyzer deepseek` | `DEEPSEEK_API_KEY` | Sangat murah |
+| **OpenAI** (Default) | `--analyzer openai` | `OPENAI_API_KEY` | Kualitas tinggi, custom base URL |
+| **Groq** | `--analyzer groq` | `GROQ_API_KEY` | ⚡ Gratis, sangat cepat |
 | **Gemini** | `--analyzer gemini` | `GEMINI_API_KEY` | Free tier tersedia |
+| **DeepSeek** | `--analyzer deepseek` | `DEEPSEEK_API_KEY` | Sangat murah |
 | **Mistral** | `--analyzer mistral` | `MISTRAL_API_KEY` | Free tier tersedia |
-| **OpenAI** | `--analyzer openai` | `OPENAI_API_KEY` | Berbayar, kualitas tinggi |
 | **Ollama** | `--analyzer ollama` | - | Offline, butuh setup |
 
 ### Contoh Penggunaan
 
 ```bash
-# Default (Groq untuk keduanya - GRATIS)
+# Default (OpenAI untuk keduanya)
 sclip -i video.mp4
+
+# Groq untuk keduanya (GRATIS)
+sclip -i video.mp4 --transcriber groq --analyzer groq
+
+# OpenAI transcription + Gemini analysis
+sclip -i video.mp4 --transcriber openai --analyzer gemini
 
 # Deepgram + DeepSeek (murah)
 sclip -i video.mp4 --transcriber deepgram --analyzer deepseek
 
-# ElevenLabs + Mistral
-sclip -i video.mp4 --transcriber elevenlabs --analyzer mistral
-
 # Fully offline (lihat section berikutnya)
 sclip -i video.mp4 --transcriber local --analyzer ollama
 ```
+
+---
+
+## Custom OpenAI-Compatible API
+
+SmartClip AI mendukung API yang kompatibel dengan OpenAI seperti Together AI, OpenRouter, MiniMax, LM Studio, dll.
+
+### Cara Menggunakan
+
+**Via CLI:**
+```bash
+# Together AI
+sclip -i video.mp4 --analyzer openai \
+    --openai-base-url https://api.together.xyz/v1 \
+    --analyzer-model meta-llama/Llama-3-70b-chat-hf
+
+# OpenRouter
+sclip -i video.mp4 --analyzer openai \
+    --openai-base-url https://openrouter.ai/api/v1 \
+    --analyzer-model anthropic/claude-3-haiku
+
+# MiniMax
+sclip -i video.mp4 --analyzer openai \
+    --openai-base-url https://api.minimax.io/v1 \
+    --analyzer-model MiniMax-M2.1
+
+# Local LM Studio
+sclip -i video.mp4 --analyzer openai \
+    --openai-base-url http://localhost:1234/v1 \
+    --analyzer-model local-model
+```
+
+**Via Config File (~/.sclip/config.json):**
+```json
+{
+  "openai_api_key": "your-api-key",
+  "openai_base_url": "https://api.together.xyz/v1",
+  "default_analyzer_model": "meta-llama/Llama-3-70b-chat-hf"
+}
+```
+
+**Via Environment Variable:**
+```bash
+export OPENAI_API_KEY="your-api-key"
+export OPENAI_BASE_URL="https://api.together.xyz/v1"
+sclip -i video.mp4 --analyzer-model meta-llama/Llama-3-70b-chat-hf
+```
+
+### Provider Populer
+
+| Provider | Base URL | Keterangan |
+|----------|----------|------------|
+| Together AI | `https://api.together.xyz/v1` | Banyak model open-source |
+| OpenRouter | `https://openrouter.ai/api/v1` | Aggregator banyak provider |
+| MiniMax | `https://api.minimax.io/v1` | Model thinking (M2.1) |
+| Groq | `https://api.groq.com/openai/v1` | Sangat cepat |
+| Fireworks | `https://api.fireworks.ai/inference/v1` | Cepat dan murah |
+
+### Di Google Colab
+
+1. Pilih `provider = 'custom'` di Step 2
+2. Isi `custom_base_url` dengan URL API
+3. Masukkan API key saat diminta
+4. Di Step 4, isi `custom_model` dengan nama model
 
 ---
 
@@ -486,7 +566,8 @@ import time; time.sleep(5)
 2. **Gunakan video pendek** (< 30 menit) untuk hasil lebih cepat
 3. **Mulai dengan dry_run** untuk preview sebelum render
 4. **Simpan API key di Secrets** agar tidak perlu input ulang
-5. **Groq adalah pilihan terbaik** - gratis dan sangat cepat!
+5. **OpenAI adalah default** - kualitas tinggi, atau gunakan Groq untuk gratis!
+6. **Custom API** - gunakan Together AI, OpenRouter untuk model alternatif
 
 ---
 
